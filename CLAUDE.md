@@ -309,6 +309,43 @@ This project uses Docker for safe development and testing:
 - ❌ `sudo` commands - No privilege escalation
 - ❌ `--rm` flags - No auto-removal containers
 
+### Git Operations Restrictions
+**DANGEROUS Git operations are PROHIBITED**:
+
+🔴 **High Risk (Permanent Data Loss)**:
+- ❌ `git reset --hard` - Permanently deletes uncommitted changes
+- ❌ `git push --force` / `git push -f` - Overwrites remote history
+- ❌ `git rebase -i` - Rewrites commit history
+- ❌ `git branch -D` - Force deletes branches
+- ❌ `git clean -fd` - Permanently deletes untracked files
+- ❌ `git reflog expire` - Clears recovery history
+
+🟡 **Medium Risk (Requires Confirmation)**:
+- ❌ `git reset HEAD~1` - Reverts commits
+- ❌ `git revert` - Undoes commits
+- ❌ `git merge --no-ff` - Complex merge operations
+- ❌ `git stash drop` - Permanently deletes stash
+
+✅ **Safe Git operations remain allowed**:
+- `git add`, `git commit`, `git status`, `git push` (normal)
+- `git checkout`, `git branch`, `git log`, `git diff`
+- All other standard git operations
+
+### GitHub Operations Restrictions
+**IMPORTANT**: Issue and PR closure require explicit user approval:
+- ❌ `gh issue close` - **PROHIBITED** - Issues must be closed manually by user
+- ❌ `gh pr close` - **PROHIBITED** - PRs must be closed manually by user  
+- ❌ `gh pr merge` - **PROHIBITED** - PRs must be merged manually by user
+- ✅ `gh issue create` / `gh issue edit` - Allowed for creating and updating
+- ✅ `gh pr create` / `gh pr view` - Allowed for creating and viewing PRs
+- ✅ `gh issue comment` - Allowed for adding comments and updates
+
+**Rationale**: 
+- Prevents accidental closure of important issues
+- Ensures user maintains control over project state
+- Provides clear audit trail for all closures
+- Allows for manual review before final actions
+
 ### Security Confirmation Policy
 **When in doubt about security implications:**
 1. **ALWAYS ask user for explicit confirmation** before:
@@ -316,6 +353,7 @@ This project uses Docker for safe development and testing:
    - Running commands that could affect the host system
    - Executing unfamiliar system commands
    - Making network requests to external services
+   - **Closing Issues or PRs** - Always inform user and ask for manual action
 
 2. **Provide clear risk assessment:**
    - What the command does
@@ -333,6 +371,19 @@ This project uses Docker for safe development and testing:
 # Before running this command, ask user:
 # "This will install better-sqlite3 (native module) - confirm? (y/n)"
 pnpm install better-sqlite3
+```
+
+### GitHub Operations Workflow
+When issues or PRs are ready for closure:
+
+```bash
+# Claude will provide completion summary and ask user:
+# "Issue #2 is complete. Please manually close with: gh issue close 2"
+# "PR #1 is ready for merge. Please manually merge with: gh pr merge 1"
+
+# User executes manually:
+gh issue close 2
+gh pr merge 1
 ```
 
 ## Best Practices
