@@ -1,0 +1,23 @@
+{
+  "name": "mtp-resume",
+  "version": "1.0.0",
+  "description": "MTP file transfer tool with smart resume capability",
+  "private": true,
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "build": "pnpm --filter @mtp-transfer/core build && pnpm --filter @mtp-transfer/cli build",
+    "dev": "pnpm --filter @mtp-transfer/cli dev",
+    "test": "pnpm --recursive test",
+    "lint": "echo 'Linting not yet configured'",
+    "clean": "rm -rf packages/*/node_modules node_modules"
+  },
+  "keywords": ["mtp", "file-transfer", "resume", "android", "cli"],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=16.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "devDependencies": {},
+  "packageManager": "pnpm@8.0.0"
+}

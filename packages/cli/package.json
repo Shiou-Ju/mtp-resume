@@ -1,0 +1,29 @@
+{
+  "name": "@mtp-transfer/cli",
+  "version": "1.0.0",
+  "description": "Command-line interface for MTP file transfer tool",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "bin": {
+    "mtp-transfer": "./src/index.js"
+  },
+  "scripts": {
+    "dev": "node src/index.js",
+    "build": "echo 'CLI package built successfully'",
+    "test": "echo 'CLI tests will be implemented'"
+  },
+  "keywords": ["mtp", "transfer", "cli", "command-line"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^11.0.0",
+    "chalk": "^4.1.2",
+    "cli-progress": "^3.12.0"
+  },
+  "devDependencies": {
+    "@mtp-transfer/core": "workspace:*"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
