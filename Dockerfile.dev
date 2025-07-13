@@ -1,0 +1,30 @@
+# Development Dockerfile for MTP Resume Project
+FROM node:18-alpine
+
+# Install system dependencies for MTP tools (for future use)
+RUN apk add --no-cache \
+    bash \
+    git \
+    libmtp-dev \
+    libusb-dev \
+    build-base \
+    python3
+
+# Set working directory
+WORKDIR /app
+
+# Install pnpm
+RUN npm install -g pnpm@8.15.0
+
+# Create non-root user for security
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S appuser -u 1001 -G nodejs
+
+# Change ownership of the working directory
+RUN chown -R appuser:nodejs /app
+
+# Switch to non-root user
+USER appuser
+
+# Default command
+CMD ["bash"]

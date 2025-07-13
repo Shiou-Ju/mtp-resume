@@ -287,12 +287,62 @@ export MTP_MOCK_MODE=true
 ./packages/cli/src/index.js transfer /tmp/mock-dest --dry-run
 ```
 
+## Security Guidelines
+
+### Docker Development Environment
+This project uses Docker for safe development and testing:
+
+```bash
+# Safe commands - isolated in containers
+./scripts/dev-docker.sh test     # Syntax checks in container
+./scripts/dev-docker.sh build    # Build development image
+./scripts/dev-docker.sh install  # Install dependencies safely
+./scripts/dev-docker.sh shell    # Interactive development
+./scripts/dev-docker.sh status   # Show container status
+```
+
+### Security Restrictions
+**CRITICAL**: The following commands are PROHIBITED for security:
+- ❌ `docker rm` / `docker rmi` - No deletion of containers/images
+- ❌ `rm -rf` / `rmdir` - No file system deletion
+- ❌ `docker system prune` - No system cleanup
+- ❌ `sudo` commands - No privilege escalation
+- ❌ `--rm` flags - No auto-removal containers
+
+### Security Confirmation Policy
+**When in doubt about security implications:**
+1. **ALWAYS ask user for explicit confirmation** before:
+   - Installing new npm packages with native components
+   - Running commands that could affect the host system
+   - Executing unfamiliar system commands
+   - Making network requests to external services
+
+2. **Provide clear risk assessment:**
+   - What the command does
+   - What system resources it accesses
+   - Potential security implications
+   - Recommended safer alternatives
+
+3. **Use Docker isolation when possible:**
+   - Prefer container-based testing over host execution
+   - Use read-only mounts when appropriate
+   - Test with mock data instead of real devices
+
+### Example Security Check
+```bash
+# Before running this command, ask user:
+# "This will install better-sqlite3 (native module) - confirm? (y/n)"
+pnpm install better-sqlite3
+```
+
 ## Best Practices
 
 - **Test each phase thoroughly before proceeding**: Don't move to next phase until current phase tests pass
 - **Write tests alongside code**: Each feature should include its tests
 - **Use mock data for CI/CD**: Ensure tests can run without real MTP devices
 - **Validate CLI usability**: Test commands with actual user scenarios
+- **Security first**: Use Docker containers for all testing and development
+- **Ask for confirmation**: When security implications are unclear, always ask user
 - Provide clear test cases for Claude to validate against
 - Use `/project:` commands for predefined workflows
 - Keep CLAUDE.md updated with latest architecture changes
