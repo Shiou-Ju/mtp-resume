@@ -3,8 +3,8 @@
  * @description Exports all core modules for MTP file transfer functionality
  */
 
-// Core modules (will be implemented in subsequent issues)
-// import Database from './database';
+// Core modules
+import { TransferDatabase } from './database';
 // import MTPWrapper from './mtp-wrapper';
 // import FileDiffer from './file-differ';
 // import TransferManager from './transfer-manager';
@@ -34,7 +34,7 @@ export function getPackageInfo(): PackageInfo {
     version: '1.0.0',
     status: 'initialized',
     modules: {
-      database: 'pending',
+      database: 'ready',
       mtpWrapper: 'pending',
       fileDiffer: 'pending',
       transferManager: 'pending'
@@ -43,7 +43,16 @@ export function getPackageInfo(): PackageInfo {
 }
 
 // Export core modules (will be uncommented as they are implemented)
-// export { Database };
+export { TransferDatabase };
+export type { 
+  TransferRecord, 
+  NewTransferRecord, 
+  UpdateTransferRecord,
+  DatabaseOptions,
+  TransferStats,
+  DatabaseInfo,
+  TransferStatus
+} from './database';
 // export { MTPWrapper };
 // export { FileDiffer };
 // export { TransferManager };
