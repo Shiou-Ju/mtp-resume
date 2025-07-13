@@ -20,6 +20,7 @@ A CLI tool for smart MTP file transfer with resume capability, built to solve Op
 - Follow error-first callback pattern
 - Keep TODO and FIXME comments intact
 - Prefer functional programming approach where applicable
+- **Use TypeScript for all new modules** (Issue #15)
 
 ## File Structure
 ```
@@ -92,17 +93,17 @@ mtp-getfile [file_id] [destination]
 
 ## Core Modules
 
-### MTPWrapper (packages/core/src/mtp-wrapper.js)
+### MTPWrapper (packages/core/src/mtp-wrapper.ts)
 - Wraps libmtp command-line tools
 - Handles device detection and file operations
 - Parses command output into structured data
 
-### TransferManager (packages/core/src/transfer-manager.js)
+### TransferManager (packages/core/src/transfer-manager.ts)
 - Manages transfer state and resume logic
 - Handles batch operations and progress tracking
 - Implements retry mechanisms for failed transfers
 
-### TransferDatabase (packages/core/src/database.js)
+### TransferDatabase (packages/core/src/database.ts)
 - SQLite operations for transfer state
 - Tracks file path, size, status, and errors
 - Provides statistics and export functionality
@@ -386,6 +387,60 @@ gh issue close 2
 gh pr merge 1
 ```
 
+## Troubleshooting
+
+### pnpm Network Issues (ERR_INVALID_THIS)
+If you encounter `ERR_INVALID_THIS` errors when installing packages:
+
+1. **Check current registry**:
+   ```bash
+   pnpm config get registry
+   ```
+
+2. **Ensure using official registry**:
+   ```bash
+   pnpm config set registry https://registry.npmjs.org/
+   ```
+
+3. **Clear pnpm cache**:
+   ```bash
+   pnpm store prune
+   ```
+
+4. **Try direct npm install as fallback**:
+   ```bash
+   npm install typescript @types/node --save-dev
+   ```
+
+5. **Check network connectivity**:
+   ```bash
+   ping registry.npmjs.org
+   ```
+
+**Note**: Avoid using third-party registries unless absolutely necessary for security reasons.
+
+## TypeScript Configuration
+
+### TypeScript Setup (Issue #15)
+All new modules must be written in TypeScript:
+
+- **File extensions**: Use `.ts` instead of `.js`
+- **Type definitions**: Install `@types/*` packages for all dependencies
+- **Build output**: Compile to `dist/` directories
+- **Source maps**: Enable for debugging
+
+### TypeScript Dependencies
+```json
+{
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0",
+    "@types/better-sqlite3": "^7.6.0",
+    "@types/commander": "^11.0.0"
+  }
+}
+```
+
 ## Best Practices
 
 - **Test each phase thoroughly before proceeding**: Don't move to next phase until current phase tests pass
@@ -402,3 +457,4 @@ gh pr merge 1
 - Handle graceful degradation when MTP tools are unavailable
 - Follow Conventional Commits format for all commits
 - Always check git status before committing to ensure clean working directory
+- **Use TypeScript for all new development** (see TypeScript Configuration section)

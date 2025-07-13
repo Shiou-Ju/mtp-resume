@@ -5,15 +5,27 @@
  * @description Command-line interface for MTP file transfer with resume capability
  */
 
-const { Command } = require('commander');
-const chalk = require('chalk');
+import { Command } from 'commander';
+import chalk from 'chalk';
 
 // Import core package (will be used in subsequent issues)
 try {
-  const core = require('@mtp-transfer/core');
-  console.log(chalk.blue('✓ Core package loaded successfully'));
+  // import { getPackageInfo } from '@mtp-transfer/core';
+  console.log(chalk.blue('✓ Core package available'));
 } catch (error) {
   console.log(chalk.yellow('⚠ Core package not yet available'));
+}
+
+/**
+ * CLI options interface
+ */
+interface TransferOptions {
+  filter?: string;
+  db: string;
+}
+
+interface ExportOptions {
+  format?: 'csv' | 'json';
 }
 
 const program = new Command();
@@ -37,7 +49,7 @@ program
   .description('開始傳輸檔案')
   .option('-f, --filter <pattern>', '檔案篩選 (例如: *.jpg)')
   .option('-d, --db <path>', '資料庫路徑', './transfer.db')
-  .action((destination, options) => {
+  .action((destination: string, options: TransferOptions) => {
     console.log(chalk.blue('📁 目標位置:'), destination);
     if (options.filter) {
       console.log(chalk.blue('🔍 檔案篩選:'), options.filter);
@@ -49,8 +61,10 @@ program
 program
   .command('export <output>')
   .description('匯出傳輸記錄')
-  .action((output) => {
+  .option('-f, --format <type>', '輸出格式 (csv, json)', 'csv')
+  .action((output: string, options: ExportOptions) => {
     console.log(chalk.blue('📄 匯出至:'), output);
+    console.log(chalk.blue('📋 格式:'), options.format);
     console.log(chalk.yellow('⚠ 此功能將在後續階段實作'));
   });
 
