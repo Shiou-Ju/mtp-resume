@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  mtp-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: mtp-resume-dev
+    volumes:
+      - .:/app
+      - node_modules_cache:/app/node_modules
+      - pnpm_cache:/home/appuser/.local/share/pnpm
+    working_dir: /app
+    stdin_open: true
+    tty: true
+    environment:
+      - NODE_ENV=development
+      - MTP_MOCK_MODE=true
+    command: bash
+
+volumes:
+  node_modules_cache:
+  pnpm_cache:

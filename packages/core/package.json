@@ -1,0 +1,21 @@
+{
+  "name": "@mtp-transfer/core",
+  "version": "1.0.0",
+  "description": "Core business logic for MTP file transfer with resume capability",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "build": "echo 'Core package built successfully'",
+    "dev": "node src/index.js",
+    "test": "echo 'Core tests will be implemented'"
+  },
+  "keywords": ["mtp", "transfer", "resume", "core"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^9.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
