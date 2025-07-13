@@ -331,6 +331,30 @@ This project uses Docker for safe development and testing:
 - `git checkout`, `git branch`, `git log`, `git diff`
 - All other standard git operations
 
+### Git Worktree Security Guidelines
+**Git Worktree operations are classified by risk level**:
+
+🔴 **High Risk (PROHIBITED)**:
+- ❌ `git worktree remove --force` - Force removes worktree, ignoring uncommitted changes
+- ❌ `git worktree prune --expire=now` - Immediately cleans all worktrees without safety checks
+- ❌ Any worktree command with `--force` or `-f` flags
+
+🟡 **Medium Risk (Requires User Confirmation)**:
+- ⚠️ `git worktree remove` - Removes worktree directory (may contain uncommitted work)
+- ⚠️ `git worktree move` - Moves worktree location (can break IDE configurations)
+- ⚠️ `git worktree prune` - Cleans up stale worktree references
+
+✅ **Safe Worktree Operations**:
+- `git worktree list` - Lists all worktrees and their status
+- `git worktree add` - Creates new worktree for parallel development
+- `git worktree repair` - Repairs corrupted worktree references
+
+**Worktree Best Practices**:
+- Always check `git worktree list` before removing worktrees
+- Ensure all important work is committed before worktree removal
+- Use `git status` in each worktree to verify clean state
+- Keep worktree directories organized and clearly named
+
 ### GitHub Operations Restrictions
 **IMPORTANT**: Issue and PR closure require explicit user approval:
 - ❌ `gh issue close` - **PROHIBITED** - Issues must be closed manually by user
