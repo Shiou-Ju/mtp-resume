@@ -181,8 +181,118 @@ feat: 新增智慧續傳功能和 SQLite 資料庫支援
 - 強化大檔案錯誤處理機制
 ```
 
+## Development Workflow with Testing
+
+### Phase-by-Phase Development
+Each development phase should include comprehensive testing before moving to the next phase:
+
+#### Phase 1: Foundation Testing
+```bash
+# After implementing monorepo structure
+pnpm install                    # Verify workspace setup
+pnpm --filter @mtp-transfer/core build  # Test core package build
+pnpm --filter @mtp-transfer/cli dev     # Test CLI package setup
+
+# Database module testing
+node -e "const db = require('./packages/core/src/database.js'); console.log('Database module loads correctly')"
+```
+
+#### Phase 2: Core Functionality Testing
+```bash
+# MTP operations testing (requires real device or mock)
+node -e "const MTP = require('./packages/core/src/mtp-wrapper.js'); console.log('MTP wrapper loads correctly')"
+
+# File comparison testing
+node -e "const differ = require('./packages/core/src/file-differ.js'); console.log('File differ loads correctly')"
+
+# Integration testing
+node -e "const manager = require('./packages/core/src/transfer-manager.js'); console.log('Transfer manager loads correctly')"
+```
+
+#### Phase 3: CLI Testing
+```bash
+# Command execution testing
+./packages/cli/src/index.js --help
+./packages/cli/src/index.js detect --dry-run
+./packages/cli/src/index.js transfer --help
+
+# Progress display testing
+./packages/cli/src/index.js transfer /tmp/test --mock-mode
+```
+
+#### Phase 4: End-to-End Testing
+```bash
+# Full workflow testing
+pnpm test                       # Run all unit tests
+pnpm test:integration          # Run integration tests
+pnpm build                     # Verify build process
+./packages/cli/src/index.js doctor  # System diagnostic
+```
+
+### Testing Guidelines for Each Issue
+
+#### Issue Validation Checklist
+Before marking any issue as complete:
+
+1. **Code Quality**
+   - [ ] All functions have proper error handling
+   - [ ] Code follows project style guidelines
+   - [ ] JSDoc comments for public APIs
+
+2. **Functionality Testing**
+   - [ ] Unit tests written and passing
+   - [ ] Integration points tested
+   - [ ] Error scenarios covered
+
+3. **CLI Testing** (for CLI-related issues)
+   - [ ] Help text displays correctly
+   - [ ] Commands accept expected parameters
+   - [ ] Error messages are user-friendly
+
+4. **Database Testing** (for database-related issues)
+   - [ ] Schema creation works
+   - [ ] CRUD operations function correctly
+   - [ ] Data persistence verified
+
+5. **Integration Testing**
+   - [ ] Module imports work correctly
+   - [ ] Dependencies resolve properly
+   - [ ] No circular dependencies
+
+### PR Testing Requirements
+
+Before creating a PR for each issue:
+
+```bash
+# Standard pre-PR checklist
+git status                     # Ensure clean working directory
+pnpm install                   # Verify dependencies
+pnpm lint                      # Code style check
+pnpm test                      # Run test suite
+pnpm build                     # Verify build process
+
+# Issue-specific testing (run the commands from the phase testing above)
+```
+
+### Mock Testing Strategy
+
+For testing without real MTP devices:
+
+```bash
+# Create mock MTP responses
+export MTP_MOCK_MODE=true
+
+# Test with mock data
+./packages/cli/src/index.js detect
+./packages/cli/src/index.js transfer /tmp/mock-dest --dry-run
+```
+
 ## Best Practices
 
+- **Test each phase thoroughly before proceeding**: Don't move to next phase until current phase tests pass
+- **Write tests alongside code**: Each feature should include its tests
+- **Use mock data for CI/CD**: Ensure tests can run without real MTP devices
+- **Validate CLI usability**: Test commands with actual user scenarios
 - Provide clear test cases for Claude to validate against
 - Use `/project:` commands for predefined workflows
 - Keep CLAUDE.md updated with latest architecture changes
