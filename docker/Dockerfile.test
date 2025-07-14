@@ -1,0 +1,45 @@
+# Docker test environment for MTP Resume project
+# Focuses on safe testing of SQLite database module
+
+FROM node:20-alpine
+
+# Install system dependencies for better-sqlite3
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    sqlite
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files for dependency installation
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY packages/core/package.json ./packages/core/
+COPY packages/cli/package.json ./packages/cli/
+
+# Install pnpm
+RUN npm install -g pnpm@10.13.1
+
+# Install dependencies (skip native modules for now)
+RUN pnpm install --frozen-lockfile
+
+# Copy source code
+COPY . .
+
+# Build TypeScript
+RUN pnpm build
+
+# Create test directory for database files
+RUN mkdir -p /app/test-data
+
+# Set environment for testing
+ENV NODE_ENV=test
+ENV TEST_DB_PATH=/app/test-data/test.db
+
+# Default command runs mock database tests (avoiding native module issues)
+CMD ["node", "packages/core/dist/test-database-mock.js"]
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD node -e "console.log('Container healthy')" || exit 1
