@@ -5,7 +5,7 @@
 
 // Core modules
 import { TransferDatabase } from './database';
-// import MTPWrapper from './mtp-wrapper';
+import { MTPWrapper } from './mtp-wrapper';
 // import FileDiffer from './file-differ';
 // import TransferManager from './transfer-manager';
 
@@ -35,7 +35,7 @@ export function getPackageInfo(): PackageInfo {
     status: 'initialized',
     modules: {
       database: 'ready',
-      mtpWrapper: 'pending',
+      mtpWrapper: 'ready',
       fileDiffer: 'pending',
       transferManager: 'pending'
     }
@@ -53,7 +53,21 @@ export type {
   DatabaseInfo,
   TransferStatus
 } from './database';
-// export { MTPWrapper };
+
+export { MTPWrapper };
+export type {
+  MTPDevice,
+  MTPFile,
+  MTPWrapperOptions,
+  MTPCommandResult,
+  MTPDownloadOptions,
+  MTPListOptions,
+  MTPTransferProgress,
+  MTPDeviceInfo,
+  MTPStorageInfo,
+  MTPErrorCode
+} from './mtp-wrapper';
+
 // export { FileDiffer };
 // export { TransferManager };
 
