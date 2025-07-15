@@ -4,9 +4,29 @@ npm-debug.log*
 .gitignore
 README.md
 .env
+.env.local
+.env.production
 .nyc_output
 coverage
 .ds_store
 *.log
 .vscode
 .idea
+
+# Build outputs
+dist
+build
+
+# Test database files
+*.db
+*.sqlite
+*.sqlite3
+test-transfers.db*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+*.swp
+*.swo
