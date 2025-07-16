@@ -6,7 +6,7 @@
 // Core modules
 import { TransferDatabase } from './database';
 import { MTPWrapper } from './mtp-wrapper';
-// import FileDiffer from './file-differ';
+import { FileDiffer } from './file-differ';
 // import TransferManager from './transfer-manager';
 
 /**
@@ -36,7 +36,7 @@ export function getPackageInfo(): PackageInfo {
     modules: {
       database: 'ready',
       mtpWrapper: 'ready',
-      fileDiffer: 'pending',
+      fileDiffer: 'ready',
       transferManager: 'pending'
     }
   };
@@ -68,7 +68,20 @@ export type {
   MTPErrorCode
 } from './mtp-wrapper';
 
-// export { FileDiffer };
+export { FileDiffer };
+export type {
+  LocalFile,
+  FileComparisonResult,
+  FileScanOptions,
+  FileDifferOptions,
+  FileFilterResult,
+  ComparisonStats,
+  FileDifferError,
+  FileDifferErrorCode,
+  ProgressCallback,
+  ScanProgress
+} from './types/file-differ-types';
+
 // export { TransferManager };
 
 // For development testing
