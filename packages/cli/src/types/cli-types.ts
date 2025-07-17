@@ -47,6 +47,8 @@ export interface ListOptions extends GlobalOptions {
  * Options for transfer command
  */
 export interface TransferOptions extends GlobalOptions {
+  /** Session ID for resume */
+  sessionId?: string;
   /** Destination path on MTP device */
   destination?: string;
   /** File filter pattern (glob) */

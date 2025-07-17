@@ -7,7 +7,7 @@
 import { TransferDatabase } from './database';
 import { MTPWrapper } from './mtp-wrapper';
 // import FileDiffer from './file-differ';
-// import TransferManager from './transfer-manager';
+import { TransferManager } from './transfer-manager';
 
 /**
  * Package information interface
@@ -37,7 +37,7 @@ export function getPackageInfo(): PackageInfo {
       database: 'ready',
       mtpWrapper: 'ready',
       fileDiffer: 'pending',
-      transferManager: 'pending'
+      transferManager: 'ready'
     }
   };
 }
@@ -69,7 +69,7 @@ export type {
 } from './mtp-wrapper';
 
 // export { FileDiffer };
-// export { TransferManager };
+export { TransferManager };
 
 // For development testing
 if (require.main === module) {

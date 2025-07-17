@@ -22,13 +22,15 @@
   "dependencies": {
     "better-sqlite3": "^9.0.0",
     "cli-table3": "^0.6.5",
-    "ora": "^8.2.0"
+    "ora": "^8.2.0",
+    "uuid": "^11.1.0"
   },
   "engines": {
     "node": ">=16.0.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
-    "@types/cli-progress": "^3.11.6"
+    "@types/cli-progress": "^3.11.6",
+    "@types/uuid": "^10.0.0"
   }
 }

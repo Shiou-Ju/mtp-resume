@@ -9,6 +9,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { registerDetectCommand } from './commands/detect';
 import { registerListCommand } from './commands/list';
+import { registerTransferCommand } from './commands/transfer';
 // GlobalOptions is used in the command definitions
 
 // Create main program
@@ -27,24 +28,9 @@ program
 // Register commands
 registerDetectCommand(program);
 registerListCommand(program);
+registerTransferCommand(program);
 
 // Placeholder commands (will be implemented next)
-program
-  .command('transfer <local-path>')
-  .description('傳輸檔案到 MTP 裝置')
-  .option('-d, --destination <path>', 'MTP 裝置上的目標路徑', '/')
-  .option('-f, --filter <pattern>', '檔案篩選模式 (glob)')
-  .option('-e, --exclude <pattern>', '排除檔案模式 (glob)')
-  .option('-c, --concurrency <n>', '並行傳輸數量', '3')
-  .option('--overwrite', '覆蓋已存在的檔案', false)
-  .option('--verify', '傳輸後驗證檔案', false)
-  .option('--dry-run', '模擬執行，不實際傳輸', false)
-  .option('--no-progress', '不顯示進度條')
-  .action((localPath: string, options: any) => {
-    console.log(chalk.blue('📁 本地路徑:'), localPath);
-    console.log(chalk.blue('📍 目標路徑:'), options.destination);
-    console.log(chalk.yellow('⚠ 此功能即將實作'));
-  });
 
 program
   .command('resume [session-id]')
