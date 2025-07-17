@@ -20,12 +20,15 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "better-sqlite3": "^9.0.0"
+    "better-sqlite3": "^9.0.0",
+    "cli-table3": "^0.6.5",
+    "ora": "^8.2.0"
   },
   "engines": {
     "node": ">=16.0.0"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13"
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/cli-progress": "^3.11.6"
   }
 }
