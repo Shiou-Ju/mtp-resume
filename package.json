@@ -30,7 +30,11 @@
   },
   "devDependencies": {
     "@types/node": "^24.0.13",
+    "@types/uuid": "^10.0.0",
     "typescript": "^5.8.3"
   },
-  "packageManager": "pnpm@10.13.1"
+  "packageManager": "pnpm@10.13.1",
+  "dependencies": {
+    "uuid": "^11.1.0"
+  }
 }

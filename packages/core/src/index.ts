@@ -7,7 +7,7 @@
 import { TransferDatabase } from './database';
 import { MTPWrapper } from './mtp-wrapper';
 import { FileDiffer } from './file-differ';
-// import TransferManager from './transfer-manager';
+import { TransferManager } from './transfer-manager';
 
 /**
  * Package information interface
@@ -37,7 +37,7 @@ export function getPackageInfo(): PackageInfo {
       database: 'ready',
       mtpWrapper: 'ready',
       fileDiffer: 'ready',
-      transferManager: 'pending'
+      transferManager: 'ready'
     }
   };
 }
@@ -49,7 +49,7 @@ export type {
   NewTransferRecord, 
   UpdateTransferRecord,
   DatabaseOptions,
-  TransferStats,
+  TransferStats as DatabaseStats,
   DatabaseInfo,
   TransferStatus
 } from './database';
@@ -82,7 +82,27 @@ export type {
   ScanProgress
 } from './types/file-differ-types';
 
-// export { TransferManager };
+export { TransferManager };
+export type {
+  TransferManagerOptions,
+  TransferSession,
+  TransferTask,
+  TransferOptions,
+  TransferResult,
+  BatchResult,
+  TransferError,
+  TransferErrorCode,
+  FailedTransfer,
+  SkippedFile,
+  TransferStats,
+  QueueStatus,
+  TransferProgress,
+  ProgressCallback as TransferProgressCallback,
+  ErrorCallback as TransferErrorCallback,
+  CompleteCallback,
+  FileStartCallback,
+  FileCompleteCallback
+} from './types/transfer-manager-types';
 
 // For development testing
 if (require.main === module) {
