@@ -1,0 +1,810 @@
+/**
+ * @fileoverview TransferManager - Core File Transfer Management
+ * @description Orchestrates file transfers between local and MTP devices with resume capability
+ */
+
+import { v4 as uuidv4 } from 'uuid';
+import type { TransferDatabase } from './database';
+import { MTPWrapper } from './mtp-wrapper';
+import { FileDiffer } from './file-differ';
+import { TransferQueue } from './utils/transfer-queue';
+import type {
+  TransferManagerOptions,
+  TransferSession,
+  TransferTask,
+  TransferOptions,
+  TransferResult,
+  BatchResult,
+  TransferProgress,
+  TransferError,
+  TransferErrorCode,
+  FailedTransfer,
+  SkippedFile,
+  TransferStats,
+  QueueStatus
+} from './types/transfer-manager-types';
+
+import {
+  DEFAULT_TRANSFER_MANAGER_OPTIONS
+} from './types/transfer-manager-types';
+import type { LocalFile, FileComparisonResult } from './types/file-differ-types';
+import type { MTPTransferProgress } from './types/mtp-types';
+import type { TransferRecord } from './types/database-types';
+
+/**
+ * TransferManager 主類別
+ * 負責協調檔案傳輸、狀態管理和錯誤處理
+ */
+export class TransferManager {
+  private db: TransferDatabase;
+  private mtpWrapper: MTPWrapper;
+  private fileDiffer: FileDiffer;
+  private transferQueue: TransferQueue;
+  private options: Required<Omit<TransferManagerOptions, 'db' | 'onProgress' | 'onError' | 'onComplete' | 'onFileStart' | 'onFileComplete'>>;
+  
+  // Session 管理
+  private activeSessions = new Map<string, TransferSession>();
+  private activeTransfers = new Map<string, TransferTask>();
+  
+  // 回調函數
+  private progressCallback?: TransferManagerOptions['onProgress'];
+  private errorCallback?: TransferManagerOptions['onError'];
+  private completeCallback?: TransferManagerOptions['onComplete'];
+  private fileStartCallback?: TransferManagerOptions['onFileStart'];
+  private fileCompleteCallback?: TransferManagerOptions['onFileComplete'];
+
+  // 統計資訊
+  private currentStats: TransferStats = this.initializeStats();
+
+  constructor(options: TransferManagerOptions) {
+    this.db = options.db;
+    this.mtpWrapper = options.mtpWrapper || new MTPWrapper();
+    this.fileDiffer = options.fileDiffer || new FileDiffer();
+    
+    // 合併選項與預設值
+    this.options = {
+      ...DEFAULT_TRANSFER_MANAGER_OPTIONS,
+      ...options
+    };
+
+    // 設定回調
+    this.progressCallback = options.onProgress;
+    this.errorCallback = options.onError;
+    this.completeCallback = options.onComplete;
+    this.fileStartCallback = options.onFileStart;
+    this.fileCompleteCallback = options.onFileComplete;
+
+    // 初始化傳輸佇列
+    this.transferQueue = new TransferQueue({
+      concurrency: this.options.concurrency,
+      events: {
+        onTaskStart: (task) => this.handleTaskStart(task),
+        onTaskComplete: (task) => this.handleTaskComplete(task),
+        onTaskError: (task, error) => this.handleTaskError(task, error),
+        onQueueEmpty: () => this.handleQueueEmpty()
+      }
+    });
+
+    // 設定任務執行器
+    this.transferQueue.setExecutor((task) => this.executeTransferTask(task));
+  }
+
+  /**
+   * 開始新的傳輸
+   */
+  public async startTransfer(localPath: string, options: TransferOptions = {}): Promise<TransferResult> {
+    const sessionId = options.sessionId || uuidv4();
+    const startTime = new Date();
+
+    try {
+      // 偵測 MTP 裝置
+      const device = await this.detectDevice();
+      
+      // 建立或恢復 session
+      const session = await this.createOrRestoreSession(sessionId, localPath, options);
+      
+      // 掃描並比對檔案
+      const comparison = await this.scanAndCompare(localPath, options.filter);
+      
+      // 準備傳輸任務
+      const tasks = await this.prepareTasks(comparison, session, options);
+      
+      // 加入佇列並開始傳輸
+      await this.transferQueue.addBatch(tasks);
+      
+      // 等待傳輸完成
+      await this.transferQueue.waitForCompletion();
+      
+      // 建立結果
+      const result = await this.createTransferResult(session);
+      
+      // 更新 session 狀態
+      await this.updateSessionStatus(session, result);
+      
+      // 觸發完成回調
+      this.completeCallback?.(result);
+      
+      return result;
+
+    } catch (error) {
+      const transferError = this.createError(
+        'TRANSFER_FAILED',
+        `Transfer failed: ${error.message}`,
+        error
+      );
+      transferError.session = sessionId;
+      
+      // 更新 session 為失敗
+      const session = this.activeSessions.get(sessionId);
+      if (session) {
+        session.status = 'failed';
+        session.error = error.message;
+        session.endTime = new Date();
+      }
+      
+      throw transferError;
+    }
+  }
+
+  /**
+   * 恢復中斷的傳輸
+   */
+  public async resumeTransfer(sessionId: string): Promise<TransferResult> {
+    try {
+      // 載入 session
+      const sessionData = await this.db.getSession?.(sessionId);
+      if (!sessionData) {
+        throw this.createError('SESSION_NOT_FOUND', `Session not found: ${sessionId}`);
+      }
+
+      // 建立傳輸選項
+      const options: TransferOptions = {
+        sessionId,
+        ...sessionData.options
+      };
+
+      // 使用原始路徑重新開始傳輸
+      return this.startTransfer(sessionData.localPath, options);
+
+    } catch (error) {
+      const transferError = this.createError(
+        'TRANSFER_FAILED',
+        `Resume transfer failed: ${error.message}`,
+        error
+      );
+      transferError.session = sessionId;
+      throw transferError;
+    }
+  }
+
+  /**
+   * 暫停傳輸
+   */
+  public async pauseTransfer(sessionId?: string): Promise<void> {
+    if (sessionId) {
+      // 暫停特定 session
+      const session = this.activeSessions.get(sessionId);
+      if (session) {
+        session.status = 'paused';
+      }
+    } else {
+      // 暫停所有傳輸
+      this.transferQueue.pause();
+      this.activeSessions.forEach(session => {
+        session.status = 'paused';
+      });
+    }
+  }
+
+  /**
+   * 取消傳輸
+   */
+  public async cancelTransfer(sessionId?: string): Promise<void> {
+    if (sessionId) {
+      // 取消特定 session
+      const session = this.activeSessions.get(sessionId);
+      if (session) {
+        session.status = 'cancelled';
+        session.endTime = new Date();
+        
+        // 從佇列移除相關任務
+        const tasks = this.transferQueue.getPendingTasks();
+        tasks.forEach(task => {
+          if (task.id.startsWith(sessionId)) {
+            this.transferQueue.remove(task.id);
+          }
+        });
+      }
+    } else {
+      // 取消所有傳輸
+      this.transferQueue.clear();
+      this.activeSessions.forEach(session => {
+        session.status = 'cancelled';
+        session.endTime = new Date();
+      });
+    }
+  }
+
+  /**
+   * 掃描並比對檔案
+   */
+  public async scanAndCompare(localPath: string, filter?: TransferOptions['filter']): Promise<FileComparisonResult> {
+    // 取得 MTP 裝置檔案
+    const mtpFiles = await this.mtpWrapper.listFiles('/', { recursive: true });
+    
+    // 執行比對
+    return this.fileDiffer.compareDirectories(localPath, mtpFiles, filter);
+  }
+
+  /**
+   * 傳輸單個檔案
+   */
+  public async transferFile(
+    file: LocalFile,
+    destination: string,
+    options: Partial<TransferOptions> = {}
+  ): Promise<TransferRecord> {
+    const task: TransferTask = {
+      id: uuidv4(),
+      file,
+      destination,
+      retries: 0,
+      status: 'pending'
+    };
+
+    // 執行傳輸
+    await this.executeTransferTask(task);
+    
+    // 取得傳輸記錄
+    const records = await this.db.getTransfersByPath(file.path);
+    return records[0];
+  }
+
+  /**
+   * 批次傳輸檔案
+   */
+  public async transferBatch(
+    files: LocalFile[],
+    destination: string,
+    options: TransferOptions = {}
+  ): Promise<BatchResult> {
+    const sessionId = options.sessionId || uuidv4();
+    const session = await this.createOrRestoreSession(sessionId, destination, options);
+    
+    // 準備任務
+    const tasks = files.map(file => ({
+      id: `${sessionId}-${file.path}`,
+      file,
+      destination,
+      retries: 0,
+      status: 'pending' as TransferStatus
+    }));
+
+    // 加入佇列
+    await this.transferQueue.addBatch(tasks);
+    
+    // 等待完成
+    await this.transferQueue.waitForCompletion();
+    
+    // 建立批次結果
+    return this.createBatchResult(sessionId, tasks);
+  }
+
+  /**
+   * 取得傳輸狀態
+   */
+  public async getTransferStatus(sessionId: string): Promise<TransferSession | null> {
+    return this.activeSessions.get(sessionId) || null;
+  }
+
+  /**
+   * 取得活動的傳輸
+   */
+  public async getActiveTransfers(): Promise<TransferSession[]> {
+    return Array.from(this.activeSessions.values())
+      .filter(session => session.status === 'active');
+  }
+
+  /**
+   * 取得傳輸歷史
+   */
+  public async getTransferHistory(limit: number = 100): Promise<TransferRecord[]> {
+    const stats = await this.db.getStatistics();
+    // 注意：這裡假設 database 有 getRecentTransfers 方法
+    return this.db.getRecentTransfers?.(limit) || [];
+  }
+
+  /**
+   * 取得佇列狀態
+   */
+  public getQueueStatus(): QueueStatus {
+    return this.transferQueue.getStatus();
+  }
+
+  /**
+   * 更新並行數
+   */
+  public setConcurrency(concurrency: number): void {
+    this.options.concurrency = concurrency;
+    this.transferQueue.setConcurrency(concurrency);
+  }
+
+  // Private methods
+
+  /**
+   * 偵測 MTP 裝置
+   */
+  private async detectDevice(): Promise<void> {
+    const device = await this.mtpWrapper.detectDevice();
+    if (!device || !device.connected) {
+      throw this.createError('NO_DEVICE', 'No MTP device connected');
+    }
+  }
+
+  /**
+   * 建立或恢復 session
+   */
+  private async createOrRestoreSession(
+    sessionId: string,
+    localPath: string,
+    options: TransferOptions
+  ): Promise<TransferSession> {
+    let session = this.activeSessions.get(sessionId);
+    
+    if (!session) {
+      session = {
+        id: sessionId,
+        localPath,
+        destination: options.mode === 'move' ? 'MTP Device' : localPath,
+        status: 'active',
+        totalFiles: 0,
+        completedFiles: 0,
+        failedFiles: 0,
+        skippedFiles: 0,
+        totalSize: 0,
+        transferredSize: 0,
+        startTime: new Date(),
+        options
+      };
+      
+      this.activeSessions.set(sessionId, session);
+    } else {
+      // 恢復 session
+      session.status = 'active';
+      session.startTime = new Date();
+      delete session.endTime;
+      delete session.error;
+    }
+    
+    return session;
+  }
+
+  /**
+   * 準備傳輸任務
+   */
+  private async prepareTasks(
+    comparison: FileComparisonResult,
+    session: TransferSession,
+    options: TransferOptions
+  ): Promise<TransferTask[]> {
+    const tasks: TransferTask[] = [];
+    
+    // 需要傳輸的檔案：新檔案 + 修改檔案
+    const filesToTransfer = [...comparison.newFiles];
+    
+    if (options.overwrite) {
+      filesToTransfer.push(...comparison.modifiedFiles);
+    }
+    
+    // 查詢已完成的傳輸
+    const completedTransfers = new Map<string, TransferRecord>();
+    for (const file of filesToTransfer) {
+      const records = await this.db.getTransfersByPath(file.path);
+      const completed = records.find(r => r.status === 'completed');
+      if (completed) {
+        completedTransfers.set(file.path, completed);
+      }
+    }
+    
+    // 建立任務
+    filesToTransfer.forEach((file, index) => {
+      // 跳過已完成的檔案
+      if (completedTransfers.has(file.path) && !options.overwrite) {
+        session.skippedFiles++;
+        return;
+      }
+      
+      tasks.push({
+        id: `${session.id}-${file.path}`,
+        file,
+        destination: 'MTP Device',
+        retries: 0,
+        status: 'pending',
+        priority: this.calculatePriority(file, index)
+      });
+    });
+    
+    // 更新 session 統計
+    session.totalFiles = tasks.length + session.skippedFiles;
+    session.totalSize = filesToTransfer.reduce((sum, file) => sum + file.size, 0);
+    
+    return tasks;
+  }
+
+  /**
+   * 執行傳輸任務
+   */
+  private async executeTransferTask(task: TransferTask): Promise<void> {
+    const maxRetries = task.file.size > 100 * 1024 * 1024 ? 5 : 3; // 大檔案更多重試
+    
+    while (task.retries <= maxRetries) {
+      try {
+        // 更新狀態
+        await this.db.updateStatus(task.file.path, task.file.size, 'transferring');
+        
+        // 查找對應的 MTP 檔案
+        const mtpFiles = await this.mtpWrapper.listFiles('/', { 
+          recursive: true,
+          includePatterns: [task.file.fileName]
+        });
+        
+        if (mtpFiles.length === 0) {
+          throw new Error(`File not found on device: ${task.file.fileName}`);
+        }
+        
+        const mtpFile = mtpFiles[0];
+        
+        // 執行下載
+        await this.mtpWrapper.downloadFile(mtpFile.id, task.file.path, {
+          onProgress: (progress) => this.handleFileProgress(task, progress)
+        });
+        
+        // 驗證傳輸
+        if (this.options.verifyAfterTransfer) {
+          await this.verifyTransfer(task.file, task.destination);
+        }
+        
+        // 更新狀態為完成
+        await this.db.updateStatus(task.file.path, task.file.size, 'completed');
+        
+        // 更新統計
+        this.updateTransferStats(task, true);
+        
+        return;
+        
+      } catch (error) {
+        task.retries++;
+        task.error = error as Error;
+        
+        if (task.retries > maxRetries) {
+          // 最終失敗
+          await this.db.updateStatus(
+            task.file.path,
+            task.file.size,
+            'failed',
+            error.message
+          );
+          
+          this.updateTransferStats(task, false);
+          throw error;
+        }
+        
+        // 重試延遲 (指數退避)
+        const delay = Math.min(
+          this.options.retryDelay * Math.pow(2, task.retries - 1),
+          30000 // 最多 30 秒
+        );
+        
+        await this.delay(delay);
+      }
+    }
+  }
+
+  /**
+   * 處理檔案傳輸進度
+   */
+  private handleFileProgress(task: TransferTask, progress: MTPTransferProgress): void {
+    // 更新任務進度
+    task.transferredBytes = (progress.percentage / 100) * task.file.size;
+    
+    // 計算整體進度
+    const overallProgress = this.calculateOverallProgress();
+    
+    // 觸發進度回調
+    this.progressCallback?.({
+      currentFile: task.file.fileName,
+      currentFileProgress: progress.percentage,
+      overallProgress: overallProgress.percentage,
+      filesCompleted: overallProgress.completed,
+      filesTotal: overallProgress.total,
+      bytesTransferred: overallProgress.bytesTransferred,
+      bytesTotal: overallProgress.bytesTotal,
+      currentSpeed: progress.speed,
+      estimatedTimeRemaining: this.estimateTimeRemaining(progress.speed),
+      status: 'transferring'
+    });
+  }
+
+  /**
+   * 處理任務開始
+   */
+  private handleTaskStart(task: TransferTask): void {
+    this.activeTransfers.set(task.id, task);
+    this.fileStartCallback?.(task.file);
+  }
+
+  /**
+   * 處理任務完成
+   */
+  private handleTaskComplete(task: TransferTask): void {
+    this.activeTransfers.delete(task.id);
+    
+    // 更新 session 統計
+    const sessionId = task.id.split('-')[0];
+    const session = this.activeSessions.get(sessionId);
+    if (session) {
+      session.completedFiles++;
+      session.transferredSize += task.file.size;
+    }
+    
+    this.fileCompleteCallback?.(task.file, true);
+  }
+
+  /**
+   * 處理任務錯誤
+   */
+  private handleTaskError(task: TransferTask, error: Error): void {
+    this.activeTransfers.delete(task.id);
+    
+    // 更新 session 統計
+    const sessionId = task.id.split('-')[0];
+    const session = this.activeSessions.get(sessionId);
+    if (session) {
+      session.failedFiles++;
+    }
+    
+    this.errorCallback?.(error, task.file);
+    this.fileCompleteCallback?.(task.file, false, error);
+  }
+
+  /**
+   * 處理佇列空
+   */
+  private handleQueueEmpty(): void {
+    // 檢查所有 session 是否完成
+    this.activeSessions.forEach(session => {
+      if (session.status === 'active') {
+        const total = session.totalFiles;
+        const processed = session.completedFiles + session.failedFiles + session.skippedFiles;
+        
+        if (processed >= total) {
+          session.status = session.failedFiles > 0 ? 'failed' : 'completed';
+          session.endTime = new Date();
+        }
+      }
+    });
+  }
+
+  /**
+   * 計算任務優先級
+   */
+  private calculatePriority(file: LocalFile, index: number): number {
+    // 小檔案優先 (< 10MB)
+    if (file.size < 10 * 1024 * 1024) {
+      return index;
+    }
+    // 中等檔案
+    if (file.size < 100 * 1024 * 1024) {
+      return index + 1000;
+    }
+    // 大檔案最後
+    return index + 2000;
+  }
+
+  /**
+   * 計算整體進度
+   */
+  private calculateOverallProgress(): {
+    percentage: number;
+    completed: number;
+    total: number;
+    bytesTransferred: number;
+    bytesTotal: number;
+  } {
+    let totalFiles = 0;
+    let completedFiles = 0;
+    let totalBytes = 0;
+    let transferredBytes = 0;
+    
+    this.activeSessions.forEach(session => {
+      totalFiles += session.totalFiles;
+      completedFiles += session.completedFiles;
+      totalBytes += session.totalSize;
+      transferredBytes += session.transferredSize;
+    });
+    
+    // 加上當前正在傳輸的進度
+    this.activeTransfers.forEach(task => {
+      transferredBytes += task.transferredBytes || 0;
+    });
+    
+    const percentage = totalBytes > 0 ? (transferredBytes / totalBytes) * 100 : 0;
+    
+    return {
+      percentage: Math.round(percentage * 100) / 100,
+      completed: completedFiles,
+      total: totalFiles,
+      bytesTransferred: transferredBytes,
+      bytesTotal: totalBytes
+    };
+  }
+
+  /**
+   * 估算剩餘時間
+   */
+  private estimateTimeRemaining(currentSpeed?: number): number | undefined {
+    if (!currentSpeed || currentSpeed === 0) {
+      return undefined;
+    }
+    
+    const progress = this.calculateOverallProgress();
+    const remainingBytes = progress.bytesTotal - progress.bytesTransferred;
+    
+    return Math.round(remainingBytes / currentSpeed);
+  }
+
+  /**
+   * 驗證傳輸
+   */
+  private async verifyTransfer(file: LocalFile, destination: string): Promise<void> {
+    // TODO: 實作檔案驗證邏輯
+    // 比較檔案大小、校驗和等
+  }
+
+  /**
+   * 更新傳輸統計
+   */
+  private updateTransferStats(task: TransferTask, success: boolean): void {
+    if (success) {
+      this.currentStats.successCount++;
+      this.currentStats.transferredBytes += task.file.size;
+    } else {
+      this.currentStats.failureCount++;
+    }
+    
+    this.currentStats.totalFiles++;
+  }
+
+  /**
+   * 建立傳輸結果
+   */
+  private async createTransferResult(session: TransferSession): Promise<TransferResult> {
+    const batch = await this.createBatchResult(
+      session.id,
+      this.transferQueue.getPendingTasks()
+    );
+    
+    return {
+      success: session.status === 'completed',
+      session,
+      batch,
+      error: session.status === 'failed' 
+        ? new Error(session.error || 'Transfer failed') 
+        : undefined
+    };
+  }
+
+  /**
+   * 建立批次結果
+   */
+  private async createBatchResult(
+    sessionId: string,
+    tasks: TransferTask[]
+  ): Promise<BatchResult> {
+    const successful: TransferRecord[] = [];
+    const failed: FailedTransfer[] = [];
+    const skipped: SkippedFile[] = [];
+    
+    // 收集結果
+    for (const task of tasks) {
+      if (task.status === 'completed') {
+        const records = await this.db.getTransfersByPath(task.file.path);
+        const record = records.find(r => r.file_size === task.file.size);
+        if (record) {
+          successful.push(record);
+        }
+      } else if (task.status === 'failed') {
+        failed.push({
+          file: task.file,
+          error: task.error || new Error('Unknown error'),
+          attempts: task.retries,
+          failedAt: task.endTime || new Date()
+        });
+      }
+    }
+    
+    // 計算統計
+    const stats: TransferStats = {
+      totalFiles: tasks.length,
+      successCount: successful.length,
+      failureCount: failed.length,
+      skippedCount: skipped.length,
+      totalBytes: tasks.reduce((sum, t) => sum + t.file.size, 0),
+      transferredBytes: successful.reduce((sum, r) => sum + r.file_size, 0),
+      duration: Date.now() - this.currentStats.startTime.getTime(),
+      averageSpeed: 0,
+      startTime: this.currentStats.startTime,
+      endTime: new Date()
+    };
+    
+    stats.averageSpeed = stats.duration > 0 
+      ? stats.transferredBytes / (stats.duration / 1000)
+      : 0;
+    
+    return {
+      sessionId,
+      successful,
+      failed,
+      skipped,
+      stats
+    };
+  }
+
+  /**
+   * 更新 session 狀態
+   */
+  private async updateSessionStatus(
+    session: TransferSession,
+    result: TransferResult
+  ): Promise<void> {
+    if (result.success) {
+      session.status = 'completed';
+    } else if (session.failedFiles > 0) {
+      session.status = 'failed';
+    }
+    
+    session.endTime = new Date();
+    
+    // TODO: 儲存 session 到資料庫
+    // await this.db.saveSession(session);
+  }
+
+  /**
+   * 初始化統計資訊
+   */
+  private initializeStats(): TransferStats {
+    return {
+      totalFiles: 0,
+      successCount: 0,
+      failureCount: 0,
+      skippedCount: 0,
+      totalBytes: 0,
+      transferredBytes: 0,
+      duration: 0,
+      averageSpeed: 0,
+      startTime: new Date(),
+      endTime: new Date()
+    };
+  }
+
+  /**
+   * 建立錯誤物件
+   */
+  private createError(
+    code: TransferErrorCode,
+    message: string,
+    originalError?: any
+  ): TransferError {
+    const error = new Error(message) as TransferError;
+    error.code = code;
+    error.details = originalError;
+    return error;
+  }
+
+  /**
+   * 延遲函數
+   */
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}
