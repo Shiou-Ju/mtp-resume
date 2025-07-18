@@ -34,6 +34,9 @@ importers:
       '@mtp-transfer/core':
         specifier: workspace:*
         version: link:../core
+      '@types/cli-progress':
+        specifier: ^3.11.6
+        version: 3.11.6
       chalk:
         specifier: ^4.1.2
         version: 4.1.2
@@ -66,6 +69,9 @@ packages:
 
   '@types/better-sqlite3@7.6.13':
     resolution: {integrity: sha512-NMv9ASNARoKksWtsq/SHakpYAYnhBrQgGD8zkLYk/jaK8jUGn08CfEdTRgYhMypUQAfzSP8W6gNLe0q19/t4VA==}
+
+  '@types/cli-progress@3.11.6':
+    resolution: {integrity: sha512-cE3+jb9WRlu+uOSAugewNpITJDt1VF8dHOopPO4IABFc3SXYL5WE/+PTz/FCdZRRfIujiWW3n3aMbv1eIGVRWA==}
 
   '@types/minimatch@6.0.0':
     resolution: {integrity: sha512-zmPitbQ8+6zNutpwgcQuLcsEpn/Cj54Kbn7L5pX0Os5kdWplB7xPgEh/g+SWOB/qmows2gpuCaPyduq8ZZRnxA==}
@@ -280,6 +286,10 @@ snapshots:
       '@isaacs/balanced-match': 4.0.1
 
   '@types/better-sqlite3@7.6.13':
+    dependencies:
+      '@types/node': 24.0.13
+
+  '@types/cli-progress@3.11.6':
     dependencies:
       '@types/node': 24.0.13
 
