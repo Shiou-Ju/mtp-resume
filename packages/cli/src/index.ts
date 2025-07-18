@@ -10,6 +10,9 @@ import chalk from 'chalk';
 import { registerDetectCommand } from './commands/detect';
 import { registerListCommand } from './commands/list';
 import { registerTransferCommand } from './commands/transfer';
+import { registerResumeCommand } from './commands/resume';
+import { registerStatusCommand } from './commands/status';
+import { registerExportCommand } from './commands/export';
 // GlobalOptions is used in the command definitions
 
 // Create main program
@@ -29,47 +32,9 @@ program
 registerDetectCommand(program);
 registerListCommand(program);
 registerTransferCommand(program);
-
-// Placeholder commands (will be implemented next)
-
-program
-  .command('resume [session-id]')
-  .description('恢復中斷的傳輸')
-  .option('-l, --list', '列出所有可恢復的傳輸', false)
-  .option('-f, --force', '強制恢復（即使裝置已變更）', false)
-  .action((sessionId: string | undefined, options: any) => {
-    if (options.list) {
-      console.log(chalk.blue('📋 可恢復的傳輸:'));
-    } else if (sessionId) {
-      console.log(chalk.blue('🔄 恢復傳輸:'), sessionId);
-    }
-    console.log(chalk.yellow('⚠ 此功能即將實作'));
-  });
-
-program
-  .command('status')
-  .description('查看傳輸狀態')
-  .option('-q, --queue', '顯示詳細佇列資訊', false)
-  .option('-w, --watch', '監看模式', false)
-  .option('-i, --interval <seconds>', '更新間隔（秒）', '1')
-  .action((_options: any) => {
-    console.log(chalk.blue('📊 傳輸狀態'));
-    console.log(chalk.yellow('⚠ 此功能即將實作'));
-  });
-
-program
-  .command('export [file]')
-  .description('匯出傳輸記錄')
-  .option('-f, --format <type>', '輸出格式: csv, json', 'csv')
-  .option('-s, --status <type>', '篩選狀態: all, completed, failed, pending', 'all')
-  .option('--limit <n>', '限制記錄數量')
-  .option('--since <date>', '只包含此日期之後的記錄')
-  .action((file: string | undefined, options: any) => {
-    const output = file || `transfer-log.${options.format}`;
-    console.log(chalk.blue('📄 匯出至:'), output);
-    console.log(chalk.blue('📋 格式:'), options.format);
-    console.log(chalk.yellow('⚠ 此功能即將實作'));
-  });
+registerResumeCommand(program);
+registerStatusCommand(program);
+registerExportCommand(program);
 
 // Development info command
 program
