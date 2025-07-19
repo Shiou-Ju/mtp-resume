@@ -51,7 +51,7 @@ export class MTPOutputParser {
       }
 
       // Extract serial number
-      const serialMatch = line.match(/(?:serial|serialnumber):\s*(.+)/i);
+      const serialMatch = line.match(/(?:serial\s*number|serialnumber|serial):\s*(.+)/i);
       if (serialMatch) {
         serialNumber = serialMatch[1].trim();
       }
@@ -90,12 +90,20 @@ export class MTPOutputParser {
     const files: MTPFile[] = [];
     const lines = output.split('\n').map(line => line.trim()).filter(line => line.length > 0);
 
+    // Check if it's the new format (File ID: format)
+    if (output.includes('File ID:')) {
+      return this.parseFileListNewFormat(output);
+    }
+
+    // Otherwise use old format parsing
     for (const line of lines) {
       // Skip header lines and empty lines
       if (line.startsWith('File listing') || 
           line.startsWith('Found') ||
           line.startsWith('===') ||
-          line.startsWith('---')) {
+          line.startsWith('---') ||
+          line.startsWith('Listing') ||
+          line.toLowerCase().includes('ok.')) {
         continue;
       }
 
@@ -174,6 +182,63 @@ export class MTPOutputParser {
     }
 
     return null;
+  }
+
+  /**
+   * Parse file list in new format (File ID: format)
+   */
+  private static parseFileListNewFormat(output: string): MTPFile[] {
+    const files: MTPFile[] = [];
+    const fileBlocks = output.split(/File ID: /g).filter(block => block.trim());
+    
+    for (const block of fileBlocks) {
+      const lines = block.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+      if (lines.length === 0) continue;
+      
+      // First line has the ID
+      const idMatch = lines[0].match(/^(\d+)/);
+      if (!idMatch) continue;
+      
+      const id = parseInt(idMatch[1]);
+      let filename = '';
+      let fileSize = 0;
+      let parentId = 0;
+      let filetype = 'file';
+      
+      for (const line of lines) {
+        if (line.startsWith('Filename:')) {
+          filename = line.substring('Filename:'.length).trim();
+        } else if (line.startsWith('File size:')) {
+          const sizeMatch = line.match(/(\d+)/);
+          if (sizeMatch) {
+            fileSize = parseInt(sizeMatch[1]);
+          }
+        } else if (line.startsWith('Parent ID:')) {
+          const parentMatch = line.match(/(\d+)/);
+          if (parentMatch) {
+            parentId = parseInt(parentMatch[1]);
+          }
+        } else if (line.startsWith('Filetype:')) {
+          const typeStr = line.substring('Filetype:'.length).trim().toLowerCase();
+          if (typeStr.includes('folder') || typeStr.includes('directory')) {
+            filetype = 'folder';
+          }
+        }
+      }
+      
+      if (filename) {
+        files.push({
+          id,
+          parentId,
+          path: `/${filename}`,
+          name: filename,
+          size: fileSize,
+          type: filetype as 'file' | 'folder'
+        });
+      }
+    }
+    
+    return files;
   }
 
   /**

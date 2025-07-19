@@ -112,7 +112,7 @@ Progress: ${percent}%`,
  */
 export class MockCommandExecutor {
   private outputs: Map<string, string> = new Map()
-  private delays: Map<string, number> = new Map()
+  public delays: Map<string, number> = new Map()
   private shouldFail: Map<string, boolean> = new Map()
 
   constructor() {
@@ -174,10 +174,11 @@ export class MockCommandExecutor {
     const duration = Date.now() - startTime
     
     if (shouldFail) {
+      const errorOutput = this.outputs.get(command) || '';
       return {
         success: false,
-        output: '',
-        error: `Command '${command}' failed`,
+        output: errorOutput,
+        error: errorOutput || `Command '${command}' failed`,
         exitCode: 1,
         duration
       }

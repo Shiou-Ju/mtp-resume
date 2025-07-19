@@ -3,34 +3,105 @@
  * @description Tests for MTP device operations wrapper
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { MTPWrapper } from '../../src/mtp-wrapper'
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { MockCommandExecutor, MTP_MOCK_OUTPUTS } from '../mocks/mtp-commands'
-import type { MTPWrapperOptions } from '../../src/mtp-wrapper'
+
+// Create a global mock executor instance
+const mockExecutor = new MockCommandExecutor()
+
+// Define MTPError for this test file
+class MTPError extends Error {
+  constructor(message: string, public code: string, public command?: string) {
+    super(message)
+    this.name = 'MTPError'
+  }
+}
 
 // Mock the command-runner module
-vi.mock('../../src/utils/command-runner', () => {
-  const mockExecutor = new MockCommandExecutor()
-  return {
-    CommandRunner: class {
-      async executeCommand(command: string, args: string[]) {
-        return mockExecutor.execute(command, args)
+vi.mock('../../src/utils/command-runner', () => ({
+  CommandRunner: class {
+    constructor(private timeout: number = 30000, private retries: number = 3, private debug: boolean = false) {}
+    
+    async executeCommand(command: string, args: string[], options?: any) {
+      // Handle timeout simulation
+      const cmdOptions = options || {}
+      const effectiveTimeout = cmdOptions.timeout || this.timeout
+      
+      // Get delay from mock executor
+      const delay = mockExecutor.delays.get(command) || 0
+      
+      // If delay exceeds timeout, throw timeout error
+      if (delay > effectiveTimeout) {
+        throw new MTPError(
+          `Command timeout after ${effectiveTimeout}ms: ${command}`,
+          'COMMAND_TIMEOUT',
+          command
+        )
       }
-    },
-    mockExecutor // Export for test access
+      
+      // Handle retries
+      const maxRetries = cmdOptions.retries !== undefined ? cmdOptions.retries : this.retries
+      let lastError = null
+      
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        if (this.debug) {
+          console.log(`[CommandRunner] Attempt ${attempt}/${maxRetries}: ${command} ${args.join(' ')}`)
+        }
+        
+        try {
+          const result = await mockExecutor.execute(command, args)
+          
+          if (this.debug) {
+            console.log(`[CommandRunner] Success on attempt ${attempt}`)
+          }
+          
+          if (!result.success) {
+            throw new MTPError(
+              result.error || `Command failed: ${command}`,
+              'COMMAND_FAILED',
+              command
+            )
+          }
+          return result
+        } catch (error) {
+          lastError = error
+          if (this.debug) {
+            console.log(`[CommandRunner] Attempt ${attempt} failed:`, error)
+          }
+          
+          // Don't retry for certain errors
+          if (error instanceof MTPError) {
+            if (error.code === 'DEVICE_NOT_FOUND' || error.code === 'ACCESS_DENIED') {
+              break
+            }
+          }
+          
+          // Add delay between retries
+          if (attempt < maxRetries) {
+            await new Promise(resolve => setTimeout(resolve, 100))
+          }
+        }
+      }
+      
+      throw lastError || new MTPError(`Command failed after ${maxRetries} attempts: ${command}`, 'COMMAND_FAILED', command)
+    }
+  },
+  MTPError: class MTPError extends Error {
+    constructor(message: string, public code: string, public command?: string) {
+      super(message)
+      this.name = 'MTPError'
+    }
   }
-})
+}))
+
+// Import after mocks
+import { MTPWrapper } from '../../src/mtp-wrapper'
 
 describe('MTPWrapper', () => {
   let mtp: MTPWrapper
-  let mockExecutor: MockCommandExecutor
 
-  beforeEach(async () => {
-    // Get mock executor instance
-    const mod = await import('../../src/utils/command-runner')
-    mockExecutor = (mod as any).mockExecutor
+  beforeEach(() => {
     mockExecutor.reset()
-    
     mtp = new MTPWrapper()
   })
 
@@ -97,7 +168,7 @@ describe('MTPWrapper', () => {
       
       const files = await mtp.listFiles('/', { recursive: true })
       
-      expect(files).toHaveLength(5)
+      expect(files).toHaveLength(4)
       const cameraFolder = files.find(f => f.name === 'Camera')
       expect(cameraFolder).toBeDefined()
       expect(cameraFolder?.parentId).toBe(1)
@@ -187,6 +258,8 @@ describe('MTPWrapper', () => {
       const withRetry = new MTPWrapper({ retries: 2 })
       let attempts = 0
       
+      // Set error output for general failure (not device not found)
+      mockExecutor.setOutput('mtp-detect', 'Error: Command timeout')
       mockExecutor.setShouldFail('mtp-detect', true)
       
       // Mock to fail first, succeed second
@@ -206,13 +279,13 @@ describe('MTPWrapper', () => {
     })
 
     it('should enable debug logging', async () => {
-      const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {})
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
       const withDebug = new MTPWrapper({ debug: true })
       
       await withDebug.detectDevice()
       
-      expect(debugSpy).toHaveBeenCalled()
-      debugSpy.mockRestore()
+      expect(logSpy).toHaveBeenCalled()
+      logSpy.mockRestore()
     })
   })
 

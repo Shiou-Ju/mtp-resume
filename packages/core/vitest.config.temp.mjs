@@ -8,6 +8,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    include: ['tests/unit/mtp-wrapper.test.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

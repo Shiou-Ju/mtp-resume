@@ -44,8 +44,8 @@ export class MTPWrapper {
     try {
       const command = this.getMTPCommand('mtp-detect');
       const result = await this.commandRunner.executeCommand(command, [], {
-        timeout: this.options.timeout,
-        retries: 1 // Device detection should be fast
+        timeout: this.options.timeout
+        // Use default retries from options
       });
 
       return MTPOutputParser.parseDeviceInfo(result.output);
@@ -94,7 +94,7 @@ export class MTPWrapper {
   async listFiles(_path: string = '/', options: MTPListOptions = {}): Promise<MTPFile[]> {
     const device = await this.detectDevice();
     if (!device || !device.connected) {
-      throw new MTPError('No MTP device connected', MTPErrorCode.DEVICE_NOT_FOUND);
+      throw new MTPError('No MTP device connected', MTPErrorCode.DEVICE_NOT_FOUND, 'mtp-files');
     }
 
     try {
@@ -136,15 +136,15 @@ export class MTPWrapper {
     fileId: number, 
     destination: string, 
     options: MTPDownloadOptions = { destination }
-  ): Promise<void> {
+  ): Promise<{ success: boolean; filePath: string }> {
     const device = await this.detectDevice();
     if (!device || !device.connected) {
-      throw new MTPError('No MTP device connected', MTPErrorCode.DEVICE_NOT_FOUND);
+      throw new MTPError('No MTP device connected', MTPErrorCode.DEVICE_NOT_FOUND, 'mtp-files');
     }
 
     try {
       const command = this.getMTPCommand('mtp-getfile');
-      const args = [fileId.toString(), options.destination];
+      const args = [fileId.toString(), destination];
 
       // Add overwrite flag if specified
       if (options.overwrite) {
@@ -169,6 +169,11 @@ export class MTPWrapper {
           estimatedTimeRemaining: 0
         });
       }
+
+      return {
+        success: true,
+        filePath: destination
+      };
 
     } catch (error) {
       if (error instanceof MTPError) {
@@ -195,7 +200,7 @@ export class MTPWrapper {
   async getStorageInfo(): Promise<MTPStorageInfo[]> {
     const device = await this.detectDevice();
     if (!device || !device.connected) {
-      throw new MTPError('No MTP device connected', MTPErrorCode.DEVICE_NOT_FOUND);
+      throw new MTPError('No MTP device connected', MTPErrorCode.DEVICE_NOT_FOUND, 'mtp-files');
     }
 
     try {
@@ -334,4 +339,5 @@ export type {
   MTPStorageInfo
 };
 
-export { MTPError, MTPErrorCode } from './types/mtp-types';
+export { MTPError } from './utils/command-runner';
+export { MTPErrorCode } from './types/mtp-types';
