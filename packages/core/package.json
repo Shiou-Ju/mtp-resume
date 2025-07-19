@@ -9,7 +9,9 @@
     "build": "tsc",
     "build:watch": "tsc --watch",
     "dev": "tsc && node dist/index.js",
-    "test": "echo 'Core tests will be implemented'"
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest --coverage"
   },
   "keywords": [
     "mtp",
@@ -20,7 +22,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "better-sqlite3": "^9.0.0",
+    "better-sqlite3": "^12.2.0",
     "minimatch": "^10.0.3"
   },
   "engines": {
