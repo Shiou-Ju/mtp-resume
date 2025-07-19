@@ -41,6 +41,12 @@ export interface ListOptions extends GlobalOptions {
   sort?: 'name' | 'size' | 'date';
   /** Reverse sort order */
   reverse?: boolean;
+  /** Show detailed information */
+  detailed?: boolean;
+  /** Filter pattern for files */
+  filter?: string;
+  /** Path to list */
+  path?: string;
 }
 
 /**
@@ -51,6 +57,8 @@ export interface TransferOptions extends GlobalOptions {
   sessionId?: string;
   /** Destination path on MTP device */
   destination?: string;
+  /** Source path on MTP device */
+  source?: string;
   /** File filter pattern (glob) */
   filter?: string;
   /** Exclude pattern (glob) */
@@ -67,6 +75,10 @@ export interface TransferOptions extends GlobalOptions {
   noProgress?: boolean;
   /** Delete source files after successful transfer */
   move?: boolean;
+  /** Auto confirm all prompts */
+  yes?: boolean;
+  /** Quiet mode - minimal output */
+  quiet?: boolean;
 }
 
 /**
@@ -183,6 +195,22 @@ export interface FileDisplay {
   type: string;
   /** File path */
   path: string;
+}
+
+/**
+ * Logger interface
+ */
+export interface Logger {
+  /** Log info message */
+  info(message: string): void;
+  /** Log success message */
+  success(message: string): void;
+  /** Log warning message */
+  warn(message: string): void;
+  /** Log error message */
+  error(message: string | Error): void;
+  /** Log debug message */
+  debug(message: string): void;
 }
 
 /**
