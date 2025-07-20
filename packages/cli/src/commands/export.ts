@@ -12,6 +12,7 @@ import { TransferDatabase } from '@mtp-transfer/core';
 import type { CommandContext, ExportOptions } from '../types/cli-types';
 import { formatBytes, formatDate } from '../utils/formatter';
 import { createLogger } from '../utils/logger';
+import { SingleBar, Presets } from 'cli-progress';
 
 /**
  * Convert transfer record to CSV row
@@ -88,6 +89,31 @@ export async function exportCommand(
     
     spinner.text = `準備匯出 ${transfers.length} 筆記錄...`;
     
+    // Show progress bar for large exports
+    const showProgress = transfers.length > 100 && !options.json;
+    let progressBar: SingleBar | null = null;
+    
+    if (showProgress) {
+      spinner.stop();
+      
+      progressBar = new SingleBar({
+        format: '匯出進度: {bar} {percentage}% | {value}/{total} 筆記錄 | 速度: {speed} 筆/秒',
+        barCompleteChar: '\u2588',
+        barIncompleteChar: '\u2591',
+        hideCursor: true,
+        clearOnComplete: true,
+        formatBar: (progress: number, options: any) => {
+          const completeSize = Math.round(progress * options.barsize);
+          const incompleteSize = options.barsize - completeSize;
+          const complete = options.barCompleteChar.repeat(completeSize);
+          const incomplete = options.barIncompleteChar.repeat(incompleteSize);
+          return `[${chalk.green(complete)}${chalk.dim(incomplete)}]`;
+        }
+      }, Presets.shades_classic);
+      
+      progressBar.start(transfers.length, 0, { speed: 0 });
+    }
+    
     // Export based on format
     if (format === 'csv') {
       // CSV Export
@@ -96,10 +122,22 @@ export async function exportCommand(
       // Add header
       csvContent.push('ID,檔案路徑,檔案大小,狀態,建立時間,更新時間,錯誤訊息');
       
-      // Add data rows
-      transfers.forEach((record: any) => {
+      // Add data rows with progress update
+      const startTime = Date.now();
+      transfers.forEach((record: any, index: number) => {
         csvContent.push(recordToCSVRow(record));
+        
+        // Update progress
+        if (progressBar && index % 10 === 0) {
+          const elapsed = (Date.now() - startTime) / 1000;
+          const speed = elapsed > 0 ? Math.floor((index + 1) / elapsed) : 0;
+          progressBar.update(index + 1, { speed });
+        }
       });
+      
+      if (progressBar) {
+        progressBar.stop();
+      }
       
       // Write to file
       await fs.writeFile(filename, csvContent.join('\n'), 'utf8');
@@ -120,13 +158,30 @@ export async function exportCommand(
           failedTransfers: transfers.filter((t: any) => t.status === 'failed').length,
           pendingTransfers: transfers.filter((t: any) => t.status === 'pending').length
         },
-        records: transfers.map((record: any) => ({
+        records: [] as any[]
+      };
+      
+      // Process records with progress
+      const startTime = Date.now();
+      transfers.forEach((record: any, index: number) => {
+        jsonData.records.push({
           ...record,
           fileSizeFormatted: formatBytes(record.file_size),
           createdAtFormatted: formatDate(new Date(record.created_at)),
           updatedAtFormatted: formatDate(new Date(record.updated_at))
-        }))
-      };
+        });
+        
+        // Update progress
+        if (progressBar && index % 10 === 0) {
+          const elapsed = (Date.now() - startTime) / 1000;
+          const speed = elapsed > 0 ? Math.floor((index + 1) / elapsed) : 0;
+          progressBar.update(index + 1, { speed });
+        }
+      });
+      
+      if (progressBar) {
+        progressBar.stop();
+      }
       
       // Write to file with pretty formatting
       await fs.writeFile(filename, JSON.stringify(jsonData, null, 2), 'utf8');
@@ -138,7 +193,11 @@ export async function exportCommand(
     // Get file stats
     const fileStats = await fs.stat(filename);
     
-    spinner.succeed(`成功匯出到 ${filename}`);
+    if (!showProgress) {
+      spinner.succeed(`成功匯出到 ${filename}`);
+    } else {
+      console.log(chalk.green(`✓ 成功匯出到 ${filename}`));
+    }
     
     // Display summary
     if (!options.json) {

@@ -202,9 +202,23 @@ export class TransferProgressDisplay {
   private overallBar: SingleBar;
   private fileProgressBar?: MultiFileProgressBar;
   private config: ProgressConfig;
+  private lastUpdateTime: number = 0;
+  private updateThrottle: number = 100; // 100ms throttle
+  private terminalWidth: number;
+  private startTime: number = 0;
+  private lastBytes: number = 0;
+  private speedHistory: number[] = [];
+  private maxSpeedSamples: number = 10;
 
   constructor(config: ProgressConfig = { useColor: true, detailed: true }) {
     this.config = config;
+    this.terminalWidth = process.stdout.columns || 80;
+    
+    // Listen for terminal resize
+    process.stdout.on('resize', () => {
+      this.terminalWidth = process.stdout.columns || 80;
+      this.updateBarSize();
+    });
     
     // Create overall progress bar
     this.overallBar = new SingleBar({
@@ -213,7 +227,8 @@ export class TransferProgressDisplay {
       barIncompleteChar: '\u2591',
       hideCursor: true,
       clearOnComplete: false,
-      formatBar: this.formatBar.bind(this)
+      formatBar: this.formatBar.bind(this),
+      barsize: Math.max(20, Math.floor(this.terminalWidth * 0.3))
     }, Presets.shades_classic);
 
     // Create file progress bar if detailed mode
@@ -223,9 +238,22 @@ export class TransferProgressDisplay {
   }
 
   /**
+   * Update bar size based on terminal width
+   */
+  private updateBarSize(): void {
+    // Note: cli-progress doesn't support dynamic bar size update
+    // This is for future enhancement
+    // const newBarSize = Math.max(20, Math.floor(this.terminalWidth * 0.3));
+  }
+
+  /**
    * Start transfer progress display
    */
   public start(totalFiles: number, totalBytes: number): void {
+    this.startTime = Date.now();
+    this.lastUpdateTime = this.startTime;
+    this.lastBytes = 0;
+    
     console.log(chalk.blue('📁 開始傳輸...'));
     console.log(chalk.dim(`總檔案: ${totalFiles} 個，總大小: ${this.formatBytes(totalBytes)}`));
     console.log('');
@@ -242,15 +270,43 @@ export class TransferProgressDisplay {
    * Update overall progress
    */
   public updateOverall(progress: ProgressInfo): void {
+    const now = Date.now();
     
-    const speed = this.formatBytes(progress.speed || 0) + '/s';
-    const eta = this.formatDuration(progress.eta);
+    // Throttle updates to prevent flickering
+    if (now - this.lastUpdateTime < this.updateThrottle) {
+      return;
+    }
+    
+    // Calculate actual speed
+    const timeDiff = (now - this.lastUpdateTime) / 1000; // seconds
+    const bytesDiff = progress.bytesTransferred - this.lastBytes;
+    const currentSpeed = timeDiff > 0 ? bytesDiff / timeDiff : 0;
+    
+    // Update speed history for smoothing
+    this.speedHistory.push(currentSpeed);
+    if (this.speedHistory.length > this.maxSpeedSamples) {
+      this.speedHistory.shift();
+    }
+    
+    // Calculate average speed
+    const avgSpeed = this.speedHistory.reduce((a, b) => a + b, 0) / this.speedHistory.length;
+    
+    // Calculate more accurate ETA
+    const remainingBytes = (progress.bytesTotal || 0) - progress.bytesTransferred;
+    const eta = avgSpeed > 0 ? remainingBytes / avgSpeed : undefined;
+    
+    // Update tracking
+    this.lastUpdateTime = now;
+    this.lastBytes = progress.bytesTransferred;
+    
+    const speed = this.formatBytes(avgSpeed) + '/s';
+    const etaStr = this.formatDuration(eta);
     
     this.overallBar.update(progress.bytesTransferred, {
       filesCompleted: progress.filesCompleted,
       filesTotal: progress.filesTotal,
       speed,
-      eta
+      eta: etaStr
     });
   }
 
@@ -292,18 +348,25 @@ export class TransferProgressDisplay {
       this.fileProgressBar.stop();
     }
 
+    const totalDuration = (Date.now() - this.startTime) / 1000;
+    const avgSpeed = this.speedHistory.length > 0 
+      ? this.speedHistory.reduce((a, b) => a + b, 0) / this.speedHistory.length
+      : 0;
+
     console.log('\n' + chalk.green('✅ 傳輸完成！'));
     console.log(chalk.blue('📊 統計資訊:'));
     console.log(`  成功: ${chalk.green(stats.successful)} 個檔案`);
     if (stats.failed > 0) {
       console.log(`  失敗: ${chalk.red(stats.failed)} 個檔案`);
     }
-    console.log(`  總時間: ${this.formatDuration(stats.totalTime / 1000)}`);
+    console.log(`  總時間: ${this.formatDuration(totalDuration)}`);
+    console.log(`  平均速度: ${this.formatBytes(avgSpeed)}/s`);
     
-    const avgSpeed = stats.totalTime > 0 ? 
-      this.formatBytes(stats.successful / (stats.totalTime / 1000)) + '/s' : 
-      '0 B/s';
-    console.log(`  平均速度: ${avgSpeed}`);
+    // Show peak speed if available
+    if (this.speedHistory.length > 0) {
+      const peakSpeed = Math.max(...this.speedHistory);
+      console.log(`  峰值速度: ${this.formatBytes(peakSpeed)}/s`);
+    }
   }
 
   /**
@@ -324,7 +387,17 @@ export class TransferProgressDisplay {
    * Create overall format string
    */
   private createOverallFormat(): string {
-    return '總進度: {bar} {percentage}% | {filesCompleted}/{filesTotal} 檔案 | {speed} | ETA: {eta}';
+    // Adjust format based on terminal width
+    if (this.terminalWidth < 80) {
+      // Compact format for narrow terminals
+      return '{bar} {percentage}% | {filesCompleted}/{filesTotal} | {speed}';
+    } else if (this.terminalWidth < 120) {
+      // Standard format
+      return '總進度: {bar} {percentage}% | {filesCompleted}/{filesTotal} 檔案 | {speed} | ETA: {eta}';
+    } else {
+      // Detailed format for wide terminals
+      return '📦 總進度: {bar} {percentage}% | {filesCompleted}/{filesTotal} 檔案 | 速度: {speed} | 剩餘時間: {eta}';
+    }
   }
 
   /**
