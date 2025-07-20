@@ -10,6 +10,8 @@ import type { CommandContext, ListOptions, FileDisplay } from '../types/cli-type
 import { createFormatter, formatBytes, formatDate } from '../utils/formatter';
 import { createLogger } from '../utils/logger';
 import { handleError } from '../utils/error-handler';
+import { SingleBar, Presets } from 'cli-progress';
+import chalk from 'chalk';
 
 /**
  * List command handler
@@ -50,14 +52,55 @@ export async function listCommand(
     
     spinner.text = `列出 ${device.model} 上的檔案...`;
     
-    // List files
+    // List files with progress for recursive listing
     logger.debug(`列出路徑: ${targetPath}, 遞迴: ${options.recursive}`);
-    const files = await mtp.listFiles(targetPath, {
-      recursive: options.recursive || false,
-      includeMetadata: true
-    });
     
-    spinner.succeed(`找到 ${files.length} 個項目`);
+    let files;
+    if (options.recursive && !options.json) {
+      spinner.stop();
+      
+      // Create progress bar for recursive listing
+      const progressBar = new SingleBar({
+        format: '掃描進度: {bar} {percentage}% | {value} 個檔案 | 目前: {currentPath}',
+        barCompleteChar: '\u2588',
+        barIncompleteChar: '\u2591',
+        hideCursor: true,
+        clearOnComplete: true,
+        formatBar: (progress: number, options: any) => {
+          const completeSize = Math.round(progress * options.barsize);
+          const incompleteSize = options.barsize - completeSize;
+          const complete = options.barCompleteChar.repeat(completeSize);
+          const incomplete = options.barIncompleteChar.repeat(incompleteSize);
+          return `[${chalk.green(complete)}${chalk.dim(incomplete)}]`;
+        }
+      }, Presets.shades_classic);
+      
+      // Start with estimated file count
+      progressBar.start(100, 0, { currentPath: targetPath });
+      
+      // Simulate progress (since onProgress is not yet implemented in core)
+      progressBar.update(50, { value: '掃描中', currentPath: targetPath });
+      
+      files = await mtp.listFiles(targetPath, {
+        recursive: true,
+        includeMetadata: true
+      } as any);
+      
+      // Note: onProgress callback is not yet implemented in core
+      // This is a placeholder for future enhancement
+      
+      progressBar.update(100, { value: files.length, currentPath: '完成' });
+      progressBar.stop();
+      
+      console.log(chalk.green(`✓ 找到 ${files.length} 個項目`));
+    } else {
+      files = await mtp.listFiles(targetPath, {
+        recursive: options.recursive || false,
+        includeMetadata: true
+      });
+      
+      spinner.succeed(`找到 ${files.length} 個項目`);
+    }
     
     // Filter hidden files if needed
     let displayFiles = files;
