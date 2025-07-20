@@ -1,0 +1,105 @@
+{
+  "device": {
+    "vendor": "Google Inc.",
+    "model": "Pixel 7 Pro",
+    "serialNumber": "TEST1234567890",
+    "version": "1.0",
+    "storageInfo": {
+      "total": 134217728000,
+      "used": 67108864000,
+      "free": 67108864000
+    }
+  },
+  "files": [
+    {
+      "id": 1,
+      "name": "DCIM",
+      "type": "folder",
+      "size": 0,
+      "parentId": 0,
+      "modificationDate": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": 2,
+      "name": "Camera",
+      "type": "folder",
+      "size": 0,
+      "parentId": 1,
+      "modificationDate": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": 100,
+      "name": "IMG_20240101_120000.jpg",
+      "type": "file",
+      "size": 2097152,
+      "parentId": 2,
+      "modificationDate": "2024-01-01T12:00:00.000Z"
+    },
+    {
+      "id": 101,
+      "name": "IMG_20240102_140000.jpg",
+      "type": "file",
+      "size": 3145728,
+      "parentId": 2,
+      "modificationDate": "2024-01-02T14:00:00.000Z"
+    },
+    {
+      "id": 102,
+      "name": "VID_20240103_160000.mp4",
+      "type": "file",
+      "size": 10485760,
+      "parentId": 2,
+      "modificationDate": "2024-01-03T16:00:00.000Z"
+    },
+    {
+      "id": 3,
+      "name": "Downloads",
+      "type": "folder",
+      "size": 0,
+      "parentId": 0,
+      "modificationDate": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": 200,
+      "name": "document.pdf",
+      "type": "file",
+      "size": 524288,
+      "parentId": 3,
+      "modificationDate": "2024-01-05T10:00:00.000Z"
+    },
+    {
+      "id": 201,
+      "name": "report.xlsx",
+      "type": "file",
+      "size": 102400,
+      "parentId": 3,
+      "modificationDate": "2024-01-06T11:00:00.000Z"
+    },
+    {
+      "id": 4,
+      "name": "Pictures",
+      "type": "folder",
+      "size": 0,
+      "parentId": 0,
+      "modificationDate": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": 300,
+      "name": "screenshot.png",
+      "type": "file",
+      "size": 1048576,
+      "parentId": 4,
+      "modificationDate": "2024-01-07T09:00:00.000Z"
+    }
+  ],
+  "transferSpeeds": {
+    "default": 5242880,
+    "slow": 1048576,
+    "fast": 10485760
+  },
+  "simulatedErrors": {
+    "transferFailureRate": 0,
+    "connectionDropRate": 0,
+    "deviceBusyRate": 0
+  }
+}

@@ -84,6 +84,11 @@ export class CommandRunner {
   ): Promise<MTPCommandResult> {
     const startTime = Date.now();
     
+    // Check for mock mode
+    if (process.env.MTP_MOCK_MODE === 'true') {
+      return this.runMockCommand(command, args, options, timeout, startTime);
+    }
+    
     return new Promise((resolve, reject) => {
       const spawnOptions: SpawnOptions = {
         cwd: options.workingDirectory,
@@ -256,6 +261,48 @@ export class CommandRunner {
    */
   private sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Run command in mock mode
+   */
+  private async runMockCommand(
+    command: string,
+    args: string[],
+    _options: MTPCommandOptions,
+    _timeout: number,
+    _startTime: number
+  ): Promise<MTPCommandResult> {
+    // Use the mock handler that's included in production build
+    const { mockHandler } = await import('./mock-handler');
+    
+    try {
+      const result = await mockHandler.execute(command, args);
+      
+      if (!result.success) {
+        throw new MTPError(
+          result.error || `Mock command failed: ${command}`,
+          this.classifyError(result.error || '', result.exitCode),
+          command
+        );
+      }
+      
+      return {
+        success: true,
+        output: result.output,
+        exitCode: result.exitCode,
+        duration: result.duration
+      };
+    } catch (error) {
+      if (error instanceof MTPError) {
+        throw error;
+      }
+      throw new MTPError(
+        `Mock command error: ${error instanceof Error ? error.message : String(error)}`,
+        MTPErrorCode.COMMAND_FAILED,
+        command
+      );
+    }
   }
 }
 

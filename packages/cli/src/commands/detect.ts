@@ -9,6 +9,7 @@ import { MTPWrapper } from '@mtp-transfer/core';
 import type { CommandContext, DetectOptions, DeviceDisplay } from '../types/cli-types';
 import { createFormatter, formatBytes } from '../utils/formatter';
 import { createLogger } from '../utils/logger';
+import { ExitCode, getExitCodeFromError } from '../utils/exit-codes';
 
 /**
  * Detect command handler
@@ -42,7 +43,7 @@ export async function detectCommand(context: CommandContext<DetectOptions>): Pro
         false
       ));
       
-      process.exit(1);
+      process.exit(ExitCode.NO_DEVICE);
     }
     
     spinner.succeed('找到 MTP 裝置');
@@ -104,8 +105,12 @@ export async function detectCommand(context: CommandContext<DetectOptions>): Pro
   } catch (error) {
     spinner.fail('偵測失敗');
     
+    let exitCode = ExitCode.GENERAL_ERROR;
+    
     if (error instanceof Error) {
-      // Handle specific error types
+      exitCode = getExitCodeFromError(error);
+      
+      // Handle specific error types with helpful messages
       if (error.message.includes('mtp-detect')) {
         logger.error('找不到 mtp-detect 命令');
         console.log('\n請安裝 libmtp:');
@@ -115,6 +120,9 @@ export async function detectCommand(context: CommandContext<DetectOptions>): Pro
       } else if (error.message.includes('permission')) {
         logger.error('權限不足');
         console.log('\n請嘗試使用 sudo 執行或將使用者加入相關群組');
+      } else if (error.message.includes('device is busy')) {
+        logger.error('裝置忙碌中');
+        console.log('\n請確認沒有其他應用程式正在使用該裝置');
       } else {
         logger.error(error);
       }
@@ -122,7 +130,7 @@ export async function detectCommand(context: CommandContext<DetectOptions>): Pro
       logger.error('未知錯誤');
     }
     
-    process.exit(1);
+    process.exit(exitCode);
   }
 }
 
