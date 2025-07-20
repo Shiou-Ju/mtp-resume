@@ -1,8 +1,10 @@
 # mtp-resume
-MTP 檔案傳輸工具，解決部分套件傳輸大量檔案時卡住的問題
+MTP 檔案下載與備份工具，解決部分套件傳輸大量檔案時卡住的問題
 
 ## 專案概述
-開發一個穩定可靠的 MTP 檔案傳輸工具，解決 OpenMTP 傳輸大量檔案時卡住的問題，並提供智慧續傳功能。
+開發一個穩定可靠的 MTP 檔案下載工具，專門用於從手機備份檔案到電腦，解決 OpenMTP 傳輸大量檔案時卡住的問題，並提供智慧續傳功能。
+
+⚠️ **重要說明**：本工具為單向下載工具，僅支援從手機下載檔案到電腦，不支援上傳、刪除或修改手機檔案。
 
 ## 🎯 專案特點與市場差異化
 
@@ -25,18 +27,31 @@ MTP 檔案傳輸工具，解決部分套件傳輸大量檔案時卡住的問題
 | **mtp-resume** | ✅ | ✅ | ✅ | ✅ | 無已知問題 |
 
 ### 🎯 目標用戶
-- 需要傳輸大量照片/影片的使用者
-- 經常遇到傳輸中斷的情況
+- 需要備份手機照片/影片的使用者
+- 經常遇到下載中斷的情況
 - 偏好命令列操作的技術使用者
 - 追求效率和可靠性的專業用戶
 
 ## 核心功能
-- **智慧續傳**：記錄傳輸進度，支援斷點續傳
-- **穩定傳輸**：能處理大檔案和錯誤情況
-- **雙介面支援**：CLI 快速操作，GUI 友善介面
-- **進度持久化**：SQLite 資料庫保存傳輸狀態
+- **智慧續傳**：記錄下載進度，支援斷點續傳
+- **穩定下載**：能處理大檔案和錯誤情況
+- **安全設計**：只讀模式，避免誤刪手機檔案
+- **進度持久化**：SQLite 資料庫保存下載狀態
 - **批次處理**：高效處理大量檔案
-- **錯誤恢復**：自動跳過問題檔案，繼續傳輸
+- **錯誤恢復**：自動跳過問題檔案，繼續下載
+
+## 🚫 功能限制
+本工具採用**安全優先**的設計理念，僅支援以下功能：
+
+| 功能 | 支援狀況 | 說明 |
+|------|---------|------|
+| **瀏覽檔案** | ✅ | 可以列出手機檔案和資料夾 |
+| **下載檔案** | ✅ | 從手機複製檔案到電腦 |
+| **續傳功能** | ✅ | 記錄已下載檔案，支援斷點續傳 |
+| **上傳檔案** | ❌ | 無法傳送檔案到手機 |
+| **刪除檔案** | ❌ | 無法刪除手機上的檔案 |
+| **移動/重命名** | ❌ | 無法修改手機檔案結構 |
+| **建立資料夾** | ❌ | 無法在手機建立新資料夾 |
 
 ### 技術架構
 
@@ -244,7 +259,7 @@ const program = new Command();
 
 program
   .name('mtp-transfer')
-  .description('智慧 MTP 檔案傳輸工具')
+  .description('智慧 MTP 檔案下載與備份工具')
   .version('1.0.0');
 
 program
@@ -262,7 +277,7 @@ program
 
 program
   .command('transfer <destination>')
-  .description('開始傳輸檔案')
+  .description('從 MTP 裝置下載檔案')
   .option('-f, --filter <pattern>', '檔案篩選 (例如: *.jpg)')
   .option('-d, --db <path>', '資料庫路徑', './transfer.db')
   .action(async (destination, options) => {
@@ -356,11 +371,11 @@ pnpm add -D @mtp-transfer/core@workspace:*
 # 偵測裝置
 mtp-transfer detect
 
-# 開始傳輸
-mtp-transfer transfer ~/Pictures/Phone
+# 下載所有檔案到指定資料夾
+mtp-transfer transfer ~/Pictures/Phone-Backup
 
-# 只傳輸照片
-mtp-transfer transfer ~/Pictures/Phone --filter "*.jpg"
+# 只下載照片
+mtp-transfer transfer ~/Pictures/Phone-Backup --filter "*.jpg"
 
 # 匯出記錄
 mtp-transfer export transfer-log.csv
@@ -393,10 +408,10 @@ mtp-transfer export transfer-log.csv
 - 設定管理
 
 ### 預期成果
-- 穩定傳輸 2000+ 檔案
+- 穩定下載 2000+ 檔案
 - 支援斷點續傳
 - 清晰的進度回饋
-- 可匯出傳輸記錄
+- 可匯出下載記錄
 
 ## 實機測試結果
 
@@ -419,10 +434,10 @@ pnpm --filter @mtp-transfer/cli dev detect
 # 列出手機照片（顯示進度）
 pnpm --filter @mtp-transfer/cli dev list /DCIM -r
 
-# 傳輸照片到電腦
-pnpm --filter @mtp-transfer/cli dev transfer /DCIM/Camera \
-  --destination ~/Pictures/Pixel7a-Backup
+# 下載照片到電腦
+pnpm --filter @mtp-transfer/cli dev transfer ~/Pictures/Pixel7a-Backup \
+  --source /DCIM/Camera
 
-# 查看傳輸進度
+# 查看下載進度
 總進度: [████████████████░░░░] 85% | 127/150 檔案 | 2.3 MB/s | ETA: 2分15秒
 ```
