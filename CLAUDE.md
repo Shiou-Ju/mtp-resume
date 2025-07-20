@@ -465,6 +465,36 @@ All new modules must be written in TypeScript:
 }
 ```
 
+## Real Device Testing Experience
+
+### Successfully Tested on Google Pixel 7a
+```bash
+# Initial connection might fail - check USB mode
+➜  mtp-resume git:(main) pnpm --filter @mtp-transfer/cli dev detect
+✖ 未找到 MTP 裝置
+
+# After adjusting USB settings to "File Transfer" mode
+➜  mtp-resume git:(main) pnpm --filter @mtp-transfer/cli dev detect
+✓ 找到 MTP 裝置
+
+裝置資訊:
+  廠商: Google
+  型號: Pixel 7a
+  序號: 037792516D5DD5C2F9718F36F8534F3B
+  狀態: 已連接
+```
+
+### Common Connection Issues
+1. **First attempt often fails** - Need to ensure phone is in "File Transfer" mode
+2. **Phone must be unlocked** - Screen lock will interrupt connection
+3. **USB cable quality matters** - Use original or high-quality cables
+4. **Hot-plug support**: Partial - need to run detect command after reconnection
+
+### Performance Considerations
+- **List command can be slow**: Large folders (e.g., /Pictures) may take time
+- **Use `-r` flag for progress**: `pnpm --filter @mtp-transfer/cli dev list /Pictures -r`
+- **MTP protocol limitations**: Each operation requires USB communication round-trip
+
 ## Best Practices
 
 - **Test each phase thoroughly before proceeding**: Don't move to next phase until current phase tests pass

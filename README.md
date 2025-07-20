@@ -397,3 +397,32 @@ mtp-transfer export transfer-log.csv
 - 支援斷點續傳
 - 清晰的進度回饋
 - 可匯出傳輸記錄
+
+## 實機測試結果
+
+### ✅ 已測試裝置
+- **Google Pixel 7a** - 成功連接並偵測
+  - 需要手機設定為「檔案傳輸」模式
+  - 首次連接可能需要調整 USB 設定
+
+### 使用體驗回饋
+1. **連接穩定性**：熱插拔部分支援，需手動重新偵測
+2. **掃描速度**：大資料夾（如 /Pictures）可能需要等待
+3. **進度顯示**：使用 `-r` 參數可顯示掃描進度條
+4. **錯誤處理**：清楚的中文錯誤提示，方便排除問題
+
+### 實際使用範例
+```bash
+# 偵測裝置
+pnpm --filter @mtp-transfer/cli dev detect
+
+# 列出手機照片（顯示進度）
+pnpm --filter @mtp-transfer/cli dev list /DCIM -r
+
+# 傳輸照片到電腦
+pnpm --filter @mtp-transfer/cli dev transfer /DCIM/Camera \
+  --destination ~/Pictures/Pixel7a-Backup
+
+# 查看傳輸進度
+總進度: [████████████████░░░░] 85% | 127/150 檔案 | 2.3 MB/s | ETA: 2分15秒
+```
