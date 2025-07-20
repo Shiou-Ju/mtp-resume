@@ -7,12 +7,15 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
+import { createErrorHandler } from './utils/error-handler';
+import { createLogger } from './utils/logger';
 import { registerDetectCommand } from './commands/detect';
 import { registerListCommand } from './commands/list';
 import { registerTransferCommand } from './commands/transfer';
 import { registerResumeCommand } from './commands/resume';
 import { registerStatusCommand } from './commands/status';
 import { registerExportCommand } from './commands/export';
+import { registerDoctorCommand } from './commands/doctor';
 // GlobalOptions is used in the command definitions
 
 // Create main program
@@ -35,6 +38,7 @@ registerTransferCommand(program);
 registerResumeCommand(program);
 registerStatusCommand(program);
 registerExportCommand(program);
+registerDoctorCommand(program);
 
 // Development info command
 program
@@ -61,6 +65,10 @@ program
     }
   });
 
+// Initialize error handling
+const logger = createLogger({ useColor: !program.opts().noColor, verbose: program.opts().verbose });
+const errorHandler = createErrorHandler(logger, { useColor: !program.opts().noColor, verbose: program.opts().verbose });
+
 // Error handling
 program.on('command:*', () => {
   console.error(chalk.red('✗ 未知命令:'), program.args.join(' '));
@@ -68,13 +76,19 @@ program.on('command:*', () => {
   process.exit(1);
 });
 
-// Handle uncaught errors
+// Handle uncaught errors with new error handler
 process.on('unhandledRejection', (error: any) => {
-  console.error(chalk.red('✗ 未處理的錯誤:'), error.message || error);
-  if (program.opts().verbose && error.stack) {
-    console.error(chalk.dim(error.stack));
-  }
-  process.exit(1);
+  errorHandler.handle(error instanceof Error ? error : new Error(String(error)), {
+    command: 'system',
+    operation: 'unhandled_rejection'
+  });
+});
+
+process.on('uncaughtException', (error: Error) => {
+  errorHandler.handle(error, {
+    command: 'system', 
+    operation: 'uncaught_exception'
+  });
 });
 
 // Parse command line arguments

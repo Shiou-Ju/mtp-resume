@@ -11,6 +11,8 @@ import type { CommandContext, TransferOptions } from '../types/cli-types';
 import { createLogger } from '../utils/logger';
 import { createProgressDisplay } from '../utils/progress';
 import { formatBytes } from '../utils/formatter';
+import { handleError } from '../utils/error-handler';
+import { createEdgeCaseHandler } from '../utils/edge-case-handler';
 
 /**
  * Transfer command handler
@@ -30,6 +32,19 @@ export async function transferCommand(
   }).start();
 
   try {
+    // Edge case validation
+    spinner.text = '驗證輸入參數...';
+    const edgeCaseHandler = createEdgeCaseHandler({ useColor: !options.noColor, verbose: options.verbose || false });
+    const validation = await edgeCaseHandler.validateAll({
+      paths: [localPath],
+      commandOptions: options,
+      checkSystem: true
+    });
+
+    if (!validation.valid) {
+      throw new Error('輸入驗證失敗');
+    }
+
     // Validate local path
     spinner.text = '驗證本地路徑...';
     const localStats = await fs.stat(localPath);
@@ -201,26 +216,11 @@ export async function transferCommand(
   } catch (error) {
     spinner.fail('傳輸準備失敗');
     
-    if (error instanceof Error) {
-      // Handle specific error types
-      if (error.message.includes('ENOENT')) {
-        logger.error(`找不到路徑: ${localPath}`);
-      } else if (error.message.includes('EACCES')) {
-        logger.error(`沒有權限存取: ${localPath}`);
-      } else if (error.message.includes('No MTP device')) {
-        logger.error('找不到 MTP 裝置');
-        console.log('\n請確認:');
-        console.log('  1. 裝置已透過 USB 連接');
-        console.log('  2. 裝置已解鎖');
-        console.log('  3. 已選擇「檔案傳輸」模式');
-      } else {
-        logger.error(error);
-      }
-    } else {
-      logger.error('未知錯誤');
-    }
-    
-    process.exit(1);
+    // Use centralized error handler
+    handleError(error instanceof Error ? error : new Error(String(error)), logger, {
+      command: 'transfer',
+      operation: 'transfer_files'
+    });
   }
 }
 
