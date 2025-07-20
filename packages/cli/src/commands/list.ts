@@ -9,6 +9,7 @@ import { MTPWrapper } from '@mtp-transfer/core';
 import type { CommandContext, ListOptions, FileDisplay } from '../types/cli-types';
 import { createFormatter, formatBytes, formatDate } from '../utils/formatter';
 import { createLogger } from '../utils/logger';
+import { handleError } from '../utils/error-handler';
 
 /**
  * List command handler
@@ -41,8 +42,10 @@ export async function listCommand(
     
     if (!device || !device.connected) {
       spinner.fail('未找到 MTP 裝置');
-      logger.error('請先連接 MTP 裝置');
-      process.exit(1);
+      handleError(new Error('No MTP device found'), logger, {
+        command: 'list',
+        operation: 'detect_device'
+      });
     }
     
     spinner.text = `列出 ${device.model} 上的檔案...`;
@@ -106,20 +109,11 @@ export async function listCommand(
   } catch (error) {
     spinner.fail('列出檔案失敗');
     
-    if (error instanceof Error) {
-      // Handle specific error types
-      if (error.message.includes('not found')) {
-        logger.error(`找不到路徑: ${targetPath}`);
-      } else if (error.message.includes('permission')) {
-        logger.error(`沒有權限存取: ${targetPath}`);
-      } else {
-        logger.error(error);
-      }
-    } else {
-      logger.error('未知錯誤');
-    }
-    
-    process.exit(1);
+    // Use centralized error handler
+    handleError(error instanceof Error ? error : new Error(String(error)), logger, {
+      command: 'list',
+      operation: 'list_files'
+    });
   }
 }
 
