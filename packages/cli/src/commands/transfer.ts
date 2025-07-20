@@ -6,7 +6,7 @@
 // @ts-ignore
 import ora from 'ora';
 import { promises as fs } from 'fs';
-import { TransferManager, TransferDatabase } from '@mtp-transfer/core';
+import { TransferManager, TransferDatabase, type FileScanOptions } from '@mtp-transfer/core';
 import type { CommandContext, TransferOptions } from '../types/cli-types';
 import { createLogger } from '../utils/logger';
 import { createProgressDisplay } from '../utils/progress';
@@ -106,9 +106,10 @@ export async function transferCommand(
       spinner.text = '執行模擬檢查...';
       
       // Create filter from options
-      const filter = options.filter ? {
-        include: [options.filter],
-        exclude: options.exclude ? [options.exclude] : []
+      const filter: FileScanOptions | undefined = options.filter || options.exclude ? {
+        ...(options.filter && { includePatterns: [options.filter] }),
+        ...(options.exclude && { excludePatterns: [options.exclude] }),
+        recursive: true
       } : undefined;
       
       const comparison = await transferManager.scanAndCompare(localPath, filter);
@@ -161,10 +162,11 @@ export async function transferCommand(
       transferOptions.sessionId = options.sessionId;
     }
     
-    if (options.filter) {
+    if (options.filter || options.exclude) {
       transferOptions.filter = {
-        include: [options.filter],
-        exclude: options.exclude ? [options.exclude] : []
+        ...(options.filter && { includePatterns: [options.filter] }),
+        ...(options.exclude && { excludePatterns: [options.exclude] }),
+        recursive: true
       };
     }
     

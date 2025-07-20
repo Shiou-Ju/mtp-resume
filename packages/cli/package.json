@@ -12,7 +12,10 @@
     "build": "tsc",
     "build:watch": "tsc --watch",
     "dev": "tsc && node dist/index.js",
-    "test": "echo 'CLI tests will be implemented'"
+    "test": "vitest run",
+    "test:watch": "vitest watch",
+    "test:e2e": "vitest run tests/e2e",
+    "test:coverage": "vitest run --coverage"
   },
   "keywords": [
     "mtp",
@@ -31,7 +34,10 @@
   },
   "devDependencies": {
     "@mtp-transfer/core": "workspace:*",
-    "@types/cli-progress": "^3.11.6"
+    "@types/cli-progress": "^3.11.6",
+    "@types/node": "^20.0.0",
+    "@vitest/coverage-v8": "^2.0.0",
+    "vitest": "^2.0.0"
   },
   "engines": {
     "node": ">=16.0.0"
